@@ -22,7 +22,6 @@ export const useEditorStore = defineStore('editor', () => {
   const currentDocumentId = ref(null);
   const currentReportId = ref(null);
   const documentTitle = ref('');
-  const isPreviewMode = ref(false);
   const isSidebarOpen = ref(false);
 
   const groupedVariables = computed(() => {
@@ -64,7 +63,6 @@ export const useEditorStore = defineStore('editor', () => {
     currentDocumentId.value = null;
     currentReportId.value = null;
     documentTitle.value = '';
-    isPreviewMode.value = false;
     pages.value = [{ id: Date.now(), background: null, objects: [] }];
     currentPageIndex.value = 0;
   };
@@ -76,7 +74,6 @@ export const useEditorStore = defineStore('editor', () => {
     currentDocumentId,
     currentReportId,
     documentTitle,
-    isPreviewMode,
     isSidebarOpen,
 
     groupedVariables,

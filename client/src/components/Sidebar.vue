@@ -19,24 +19,7 @@
           <span class="rail-label">ข้อมูลเกษียณ</span>
         </button>
 
-        <button @click="handleTabClick('assets')" @mouseenter="handleMouseEnter('assets')" :class="[
-          'rail-btn',
-          { active: activeTab === 'assets' && isOpen, pinned: isPinned && activeTab === 'assets' }
-        ]">
-          <span class="rail-icon icon-image"></span>
-          <span class="rail-label">รูปภาพ</span>
-        </button>
 
-        <button @click="handleTabClick('project')" @mouseenter="handleMouseEnter('project')" :class="[
-          'rail-btn',
-          {
-            active: activeTab === 'project' && isOpen,
-            pinned: isPinned && activeTab === 'project'
-          }
-        ]">
-          <span class="rail-icon icon-project"></span>
-          <span class="rail-label">โปรเจกต์</span>
-        </button>
       </div>
     </div>
 
@@ -55,16 +38,6 @@
         </div>
 
 
-
-        <div class="panel-header-title" v-if="activeTab === 'assets'">
-          <span class="panel-header-icon icon-image-header"></span>
-          <h3 class="panel-header-text">คลังรูปภาพ</h3>
-        </div>
-
-        <div class="panel-header-title" v-if="activeTab === 'project'">
-          <span class="panel-header-icon icon-project-header"></span>
-          <h3 class="panel-header-text">จัดการโปรเจกต์</h3>
-        </div>
       </div>
       <div class="panel-content">
         <div v-if="activeTab === 'pages'" class="tab-pane-pages">
@@ -139,101 +112,7 @@
           </div>
         </div>
 
-        <div v-if="activeTab === 'assets'" class="tab-pane">
-          <AssetManager :is-preview-mode="isPreviewMode" @select-asset="$emit('add-image', $event)" />
-        </div>
 
-        <div v-if="activeTab === 'project'" class="tab-pane-project">
-          <div class="project-section">
-            <h4 class="label">นำเข้าโปรเจกต์ / PDF / รูปภาพ</h4>
-            <div class="upload-container">
-              <button class="btn-upload-dashed" @click.stop="$emit('import-workspace')" :disabled="!isCanvasReady">
-                <span class="btn-upload-dashed-icon"></span>
-                <span class="btn-upload-dashed-text">นำเข้าโปรเจกต์</span>
-              </button>
-              <button class="btn-upload-dashed" style="margin-top: 8px; border-color: #2196f3; background-image: none"
-                @click.stop="promptForUrl" :disabled="!isCanvasReady">
-                <span class="btn-upload-dashed-text" style="color: #2196f3">นำเข้าจาก URL</span>
-              </button>
-            </div>
-            <p class="hint-text">รองรับไฟล์ : PDF</p>
-          </div>
-
-          <div class="project-section">
-            <button @click="$emit('save-report')" class="btn-project-save" :disabled="isPreviewMode">
-              <span class="btn-project-save-text">บันทึกโปรเจกต์</span>
-            </button>
-            <p class="hint-text">บันทึกลงประวัติและไฟล์ Hybrid PDF</p>
-          </div>
-          <div class="project-section">
-            <h4 class="label">คุณภาพ PDF:</h4>
-            <div class="radio-group-list">
-              <div :class="['radio-card', { active: pdfQuality == '1' }]" @click="$emit('update:pdfQuality', '1')">
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfQuality == '1'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">ฉบับร่าง</div>
-                  <div class="radio-subtitle">ไฟล์เล็ก เหมาะสำหรับตรวจงาน</div>
-                </div>
-                <div class="radio-badge">1x</div>
-              </div>
-              <div :class="['radio-card', { active: pdfQuality == '2' }]" @click="$emit('update:pdfQuality', '2')">
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfQuality == '2'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">มาตรฐาน</div>
-                  <div class="radio-subtitle">สมดุลระหว่างคุณภาพและขนาด</div>
-                </div>
-                <div class="radio-badge">2x</div>
-              </div>
-              <div :class="['radio-card', { active: pdfQuality == '3' }]" @click="$emit('update:pdfQuality', '3')">
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfQuality == '3'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">ละเอียด(HD)</div>
-                  <div class="radio-subtitle">คมชัดสูง สำหรับจอ Retina</div>
-                </div>
-                <div class="radio-badge">3x</div>
-              </div>
-              <div :class="['radio-card', { active: pdfQuality == '4' }]" @click="$emit('update:pdfQuality', '4')">
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfQuality == '4'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">สำหรับพิมพ์</div>
-                  <div class="radio-subtitle">ความละเอียดสูงสุด</div>
-                </div>
-                <div class="radio-badge">4x</div>
-              </div>
-            </div>
-          </div>
-
-
-
-          <div class="project-section" style="margin-top: 10px; margin-bottom: 30px">
-            <button @click="$emit('generate-pdf')" class="btn-print-outline" :disabled="isGenerating || isPreviewMode">
-              <span class="btn-print-text">
-                {{ isGenerating ? 'กำลังสร้าง PDF...' : 'ส่งออกเป็นไฟล์ PDF' }}
-              </span>
-            </button>
-          </div>
-
-          <div class="danger-zone">
-            <div class="danger-zone-title">พื้นที่อันตราย</div>
-            <button @click="$emit('reset-project')" class="btn-reset-project" title="ล้างข้อมูลการแก้ไขทั้งหมด">
-              <svg class="reset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                <path d="M3 3v5h5"></path>
-              </svg>
-              เริ่มใหม่จากต้นฉบับ
-            </button>
-            <p class="danger-hint">การกระทำนี้จะล้างการแก้ไขที่ยังไม่ได้บันทึกทั้งหมด</p>
-          </div>
-        </div>
       </div>
 
       <div class="panel-footer" v-if="activeTab === 'pages'">
@@ -276,13 +155,6 @@ const onWorkspaceFileChange = (e) => {
 const activeTab = ref('pages');
 const isPinned = ref(false);
 
-const promptForUrl = () => {
-  const url = window.prompt('กรุณาวางลิงก์ PDF ที่ต้องการนำเข้า:');
-  if (url && url.trim()) {
-    emit('import-url', url.trim());
-  }
-};
-
 const handleMouseEnter = (tabId) => {
   activeTab.value = tabId;
   emit('open');
@@ -319,8 +191,6 @@ const props = defineProps({
   connectionStatus: String,
   isCanvasReady: Boolean,
   isPreviewMode: Boolean,
-  isGenerating: Boolean,
-  pdfQuality: [String, Number],
   pages: {
     type: Array,
     default: () => []
@@ -337,24 +207,20 @@ const groupedVariables = ref({
 });
 
 const emit = defineEmits([
-  'update:pdfQuality',
   'reset-canvas',
-  'toggle-preview',
   'import-workspace',
   'add-variable',
-  'add-image',
   'add-signature-block',
-  'save-report',
-  'generate-pdf',
   'open-history',
   'toggle',
   'open',
   'close',
-  'import-url',
   'delete-page',
   'page-click',
   'page-drop',
-  'unified-import'
+  'unified-import',
+  'add-page',
+  'import-page'
 ]);
 
 const draggedPageIndex = ref(null);
@@ -431,12 +297,7 @@ const onCustomTextDragStart = (e) => {
 };
 </script>
 
-<script>
-import AssetManager from './AssetManager.vue';
-export default {
-  components: { AssetManager }
-};
-</script>
+
 
 <style scoped>
 .sidebar-container {
@@ -1295,17 +1156,7 @@ select {
   color: white;
 }
 
-.icon-image {
-  background-image: url('../assets/icons/image.png');
-}
 
-.rail-btn.active .icon-image {
-  background-image: url('../assets/icons/image-active.png');
-}
-
-.icon-image-header {
-  background-image: url('../assets/icons/image-active.png');
-}
 
 .tab-pane-project {
   display: flex;
@@ -1322,62 +1173,7 @@ select {
   margin-bottom: 20px;
 }
 
-.btn-upload-dashed {
-  width: 298px;
-  height: 46px;
-  background-color: #f8f9fa;
-  background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='5' ry='5' stroke='%23DEE2E6' stroke-width='2.5' stroke-dasharray='5, 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
-  border-radius: 6px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
 
-.btn-upload-dashed:hover:not(:disabled) {
-  background-color: #f1f3f5;
-}
-
-.btn-upload-dashed-icon {
-  width: 20px;
-  height: 20px;
-  background: transparent url('../assets/icons/upload.svg') center/contain no-repeat;
-}
-
-.upload-icon-wrapper {
-  position: relative;
-  width: 14px;
-  height: 13px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.upload-icon-top {
-  width: 6px;
-  height: 10px;
-  background: #546267;
-  clip-path: polygon(50% 0%, 100% 35%, 75% 35%, 75% 100%, 25% 100%, 25% 35%, 0% 35%);
-}
-
-.upload-icon-bottom {
-  position: absolute;
-  bottom: 0;
-  width: 14px;
-  height: 4px;
-  background: #546267;
-}
-
-.btn-upload-dashed-text {
-  font:
-    normal normal bold 21px/28px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #546267;
-}
 
 .hint-text {
   text-align: left;
@@ -1566,17 +1362,7 @@ select {
   color: #ccc;
 }
 
-.icon-project {
-  background-image: url('../assets/icons/project.png');
-}
 
-.rail-btn.active .icon-project {
-  background-image: url('../assets/icons/project-active.png');
-}
-
-.icon-project-header {
-  background-image: url('../assets/icons/project-active.png');
-}
 
 .icon-layers-header {
   background-image: url('../assets/icons/layers-active.png');

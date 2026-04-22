@@ -41,15 +41,6 @@ model Variable {
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 }
 
-model Asset {
-  id        String   @id @default(uuid())
-  filename  String
-  mimetype  String
-  filepath  String
-  url       String
-  createdAt DateTime @default(now())
-}
-
 model PdfCache {
   OriginalFileId    String   @id @default(uuid())
   OriginalFile      Boolean  @default(true)

@@ -1,19 +1,21 @@
 <template>
   <div class="app-layout">
-    <TopNavbar :zoom-level="zoomLevel" :is-preview-mode="isPreviewMode" :is-generating="isGenerating" @go-home="goHome"
-      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @toggle-preview="togglePreviewWrapper" />
+    <TopNavbar :zoom-level="zoomLevel" :is-preview-mode="isPreviewMode" :is-generating="isGenerating"
+      :pdf-quality="pdfQuality" @go-home="goHome"
+      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut"
+      @save-report="handleSaveProject" @generate-pdf="handleExport"
+      @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
 
     <Sidebar :isOpen="isSidebarOpen" :is-history-open="showHistoryModal" :connectionStatus="connectionStatus"
       :isCanvasReady="isCanvasReady" :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables"
-      :isGenerating="isGenerating" :pdfQuality="pdfQuality"
       :pages="pages" :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
-      @close="isSidebarOpen = false" @update:pdfQuality="pdfQuality = $event" @reset-canvas="goHome"
-      @toggle-preview="togglePreviewWrapper" @import-workspace="handleImportWorkspaceWrapper"
-      @add-variable="handleAddVariable" @addImage="addImageToCanvasWrapper" @save-report="handleSaveProject"
-      @generate-pdf="handleExport" @open-history="openHistoryModal" @delete-page="deletePage"
+      @close="isSidebarOpen = false" @reset-canvas="goHome"
+      @import-workspace="handleImportWorkspaceWrapper"
+      @add-variable="handleAddVariable"
+      @open-history="openHistoryModal" @delete-page="deletePage"
       @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
-      @page-drop="handlePageDrop" @import-url="handleUrlImport"
-      @reset-project="handleReset" @add-signature-block="handleAddSignatureBlock"
+      @page-drop="handlePageDrop"
+      @add-signature-block="handleAddSignatureBlock"
       @add-custom-variable="addCustomVariable" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
@@ -275,7 +277,7 @@ const {
   resetHistory,
   undo,
   redo,
-  addImageToCanvas,
+
   addVariableToCanvas,
   addSignatureBlockToCanvas,
   addStampBlockToCanvas,
@@ -452,7 +454,7 @@ const handleSaveProject = async () => {
     const canvasImages = [];
     const P_H = CANVAS_CONSTANTS.PAGE_HEIGHT;
     const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-    const qualityMultiplier = 2;
+    const qualityMultiplier = Number(pdfQuality.value) || 2;
     const TEXT_TYPES = ['textbox', 'text', 'i-text'];
     const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
 
@@ -665,7 +667,7 @@ const handleExport = async () => {
     const canvasImages = [];
     const P_H = CANVAS_CONSTANTS.PAGE_HEIGHT;
     const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-    const qualityMultiplier = 2;
+    const qualityMultiplier = Number(pdfQuality.value) || 2;
     const TEXT_TYPES = ['textbox', 'text', 'i-text'];
     const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
 
@@ -916,13 +918,8 @@ const handleAddVariable = (key) => {
   addVariableToCanvas(key, targetLeft - 100, targetTop);
 };
 
-const addImageToCanvasWrapper = (url) => {
-  if (!url) return;
-  const targetTop = getPageTopOffset(currentPageIndex.value) + 100;
-  const targetLeft = getWorkspaceMaxWidth() / 2;
 
-  addImageToCanvas(url, targetLeft - 100, targetTop);
-};
+
 
 const cleanupCanvasObjects = () => {
   if (!canvas.value) return;
@@ -1504,7 +1501,6 @@ const onDrop = (e) => {
   e.preventDefault();
 
   const variable = e.dataTransfer.getData('variable');
-  const asset = e.dataTransfer.getData('asset');
 
   let x = 0;
   let y = 0;
@@ -1529,7 +1525,6 @@ const onDrop = (e) => {
   }
 
   if (variable && typeof addVariableToCanvas !== 'undefined') addVariableToCanvas(variable, x, y);
-  if (asset && typeof addImageToCanvas !== 'undefined') addImageToCanvas(asset, x, y);
   const customText = e.dataTransfer.getData('customText');
   if (customText) addCustomTextToCanvas(x, y);
 
@@ -1572,13 +1567,104 @@ const handleRouteChange = async () => {
 
     try {
       const data = await apiService.importPdfFromUrl(externalUrl);
-
       const newPdfId = data.OriginalFileId || data.id || data.fileId;
 
       if (newPdfId) {
+        console.log('[STAMP-DEBUG] URL import success, newPdfId:', newPdfId);
         window.history.replaceState({}, '', `/pdf/${newPdfId}`);
-        window.location.reload();
-        return;
+        activePdfId = newPdfId;
+
+        const workspaceData = await apiService.prepareWorkspace(newPdfId);
+        console.log('[STAMP-DEBUG] workspaceData.editState:', !!workspaceData.editState);
+
+        if (workspaceData.editState) {
+          let parsedState = workspaceData.editState;
+          while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
+          pages.value = parsedState;
+          currentPageIndex.value = 0;
+          await nextTick();
+
+          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
+            Array.isArray(page.objects) && page.objects.some(obj =>
+              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+            )
+          );
+          console.log('[STAMP-DEBUG] editState has stamp:', hasStamp);
+
+          await new Promise(r => setTimeout(async () => {
+            if (typeof renderAllPages === 'function') await renderAllPages();
+            r();
+          }, 500));
+
+          if (!hasStamp) {
+            try {
+              console.log('[STAMP-DEBUG] Fetching stamp metadata for:', newPdfId);
+              const stampMeta = await apiService.getStampMetadata(newPdfId);
+              console.log('[STAMP-DEBUG] Got stamp metadata:', stampMeta);
+              console.log('[STAMP-DEBUG] addStampBlockToCanvas is:', typeof addStampBlockToCanvas);
+              console.log('[STAMP-DEBUG] canvas.value is:', !!canvas.value);
+              if (addStampBlockToCanvas) {
+                addStampBlockToCanvas(stampMeta);
+                console.log('[STAMP-DEBUG] Stamp block added to canvas!');
+                setTimeout(async () => {
+                  try {
+                    saveCurrentPageState();
+                    const pagesData = preparePagesForSave();
+                    const fd = new FormData();
+                    fd.append('OriginalFileId', newPdfId);
+                    fd.append('editState', JSON.stringify(pagesData));
+                    await apiService.savePdfState(fd);
+                    console.log('[STAMP-DEBUG] Stamp auto-saved!');
+                  } catch (err) { console.error('[STAMP-DEBUG] Auto-save stamp failed', err); }
+                }, 500);
+              }
+            } catch (e) { console.warn('[STAMP-DEBUG] Stamp add failed', e); }
+          }
+        } else {
+          console.log('[STAMP-DEBUG] No editState, rendering PDF from scratch');
+          const blobData = await apiService.downloadBlob(workspaceData.tempPath);
+          const downloadedFile = new File([blobData], 'url_import.pdf', { type: 'application/pdf' });
+
+          await resetCanvasWrapper();
+          const images = await processPdfToImages(downloadedFile);
+          console.log('[STAMP-DEBUG] Processed', images.length, 'pages');
+          if (images.length > 0) {
+            pages.value = images.map((imgObj, idx) => ({
+              id: Date.now() + idx,
+              background: imgObj.dataUrl,
+              width: imgObj.width,
+              height: imgObj.height,
+              objects: [],
+              originalBackgroundType: 'PDF'
+            }));
+            currentPageIndex.value = 0;
+            await renderAllPages();
+            console.log('[STAMP-DEBUG] renderAllPages done, now adding stamp');
+
+            try {
+              const stampMeta = await apiService.getStampMetadata(newPdfId);
+              console.log('[STAMP-DEBUG] Got stamp metadata:', stampMeta);
+              console.log('[STAMP-DEBUG] addStampBlockToCanvas is:', typeof addStampBlockToCanvas);
+              console.log('[STAMP-DEBUG] canvas.value is:', !!canvas.value);
+              if (addStampBlockToCanvas) {
+                addStampBlockToCanvas(stampMeta);
+                console.log('[STAMP-DEBUG] Stamp block added!');
+                setTimeout(async () => {
+                  try {
+                    saveCurrentPageState();
+                    const pagesData = preparePagesForSave();
+                    const fd = new FormData();
+                    fd.append('OriginalFileId', newPdfId);
+                    fd.append('editState', JSON.stringify(pagesData));
+                    await apiService.savePdfState(fd);
+                    console.log('[STAMP-DEBUG] Stamp auto-saved!');
+                  } catch (err) { console.error('[STAMP-DEBUG] Auto-save stamp failed', err); }
+                }, 500);
+              }
+            } catch (e) { console.warn('[STAMP-DEBUG] Stamp add failed', e); }
+          }
+        }
+        return true;
       }
     } catch (error) {
       console.error('Direct URL Import Failed:', error);
@@ -1593,12 +1679,87 @@ const handleRouteChange = async () => {
     const localPath = localPathMatch[1];
     try {
       const data = await apiService.importPdfLocal(localPath);
-
       const newPdfId = data.OriginalFileId || data.id;
+
       if (newPdfId) {
         window.history.replaceState({}, '', `/pdf/${newPdfId}`);
-        window.location.reload();
-        return;
+        activePdfId = newPdfId;
+
+        const workspaceData = await apiService.prepareWorkspace(newPdfId);
+
+        if (workspaceData.editState) {
+          let parsedState = workspaceData.editState;
+          while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
+          pages.value = parsedState;
+          currentPageIndex.value = 0;
+          await nextTick();
+
+          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
+            Array.isArray(page.objects) && page.objects.some(obj =>
+              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+            )
+          );
+
+          await new Promise(r => setTimeout(async () => {
+            if (typeof renderAllPages === 'function') await renderAllPages();
+            r();
+          }, 500));
+
+          if (!hasStamp) {
+            try {
+              const stampMeta = await apiService.getStampMetadata(newPdfId);
+              if (addStampBlockToCanvas) {
+                addStampBlockToCanvas(stampMeta);
+                setTimeout(async () => {
+                  try {
+                    saveCurrentPageState();
+                    const pagesData = preparePagesForSave();
+                    const fd = new FormData();
+                    fd.append('OriginalFileId', newPdfId);
+                    fd.append('editState', JSON.stringify(pagesData));
+                    await apiService.savePdfState(fd);
+                  } catch (err) { console.error('Auto-save stamp failed', err); }
+                }, 500);
+              }
+            } catch (e) { console.warn('Stamp add failed', e); }
+          }
+        } else {
+          const blobData = await apiService.downloadBlob(workspaceData.tempPath);
+          const downloadedFile = new File([blobData], 'local_import.pdf', { type: 'application/pdf' });
+
+          await resetCanvasWrapper();
+          const images = await processPdfToImages(downloadedFile);
+          if (images.length > 0) {
+            pages.value = images.map((imgObj, idx) => ({
+              id: Date.now() + idx,
+              background: imgObj.dataUrl,
+              width: imgObj.width,
+              height: imgObj.height,
+              objects: [],
+              originalBackgroundType: 'PDF'
+            }));
+            currentPageIndex.value = 0;
+            await renderAllPages();
+
+            try {
+              const stampMeta = await apiService.getStampMetadata(newPdfId);
+              if (addStampBlockToCanvas) {
+                addStampBlockToCanvas(stampMeta);
+                setTimeout(async () => {
+                  try {
+                    saveCurrentPageState();
+                    const pagesData = preparePagesForSave();
+                    const fd = new FormData();
+                    fd.append('OriginalFileId', newPdfId);
+                    fd.append('editState', JSON.stringify(pagesData));
+                    await apiService.savePdfState(fd);
+                  } catch (err) { console.error('Auto-save stamp failed', err); }
+                }, 500);
+              }
+            } catch (e) { console.warn('Stamp add failed', e); }
+          }
+        }
+        return true;
       }
     } catch (error) {
       console.error('Local Import Failed:', error);
@@ -1642,7 +1803,7 @@ const handleRouteChange = async () => {
     } catch (error) {
       console.error('Failed to load PDF from filepath param:', error);
     }
-    return;
+    return true;
   }
 
   const pdfMatch = currentPath.match(/^\/pdf\/([a-zA-Z0-9-]+)/i);
@@ -1667,9 +1828,46 @@ const handleRouteChange = async () => {
           pages.value = parsedState;
           currentPageIndex.value = 0;
           await nextTick();
-          setTimeout(async () => {
-            if (typeof renderAllPages === 'function') await renderAllPages();
-          }, 500);
+
+          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
+            Array.isArray(page.objects) && page.objects.some(obj =>
+              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+            )
+          );
+
+          if (hasStamp) {
+            setTimeout(async () => {
+              if (typeof renderAllPages === 'function') await renderAllPages();
+            }, 500);
+          } else {
+            await new Promise(resolve => {
+              setTimeout(async () => {
+                if (typeof renderAllPages === 'function') await renderAllPages();
+                resolve();
+              }, 500);
+            });
+
+            try {
+              const stampMeta = await apiService.getStampMetadata(fileId);
+              if (addStampBlockToCanvas) {
+                addStampBlockToCanvas(stampMeta);
+                setTimeout(async () => {
+                  try {
+                    saveCurrentPageState();
+                    const pagesData = preparePagesForSave();
+                    const formData = new FormData();
+                    formData.append('OriginalFileId', fileId);
+                    formData.append('editState', JSON.stringify(pagesData));
+                    await apiService.savePdfState(formData);
+                  } catch (err) {
+                    console.error('Failed to auto-save stamp block', err);
+                  }
+                }, 500);
+              }
+            } catch (e) {
+              console.warn('Failed to add auto stamp on existing file', e);
+            }
+          }
         } catch (e) {
           console.error('Restoration Error', e);
         }
@@ -1692,13 +1890,34 @@ const handleRouteChange = async () => {
           }));
           currentPageIndex.value = 0;
           await renderAllPages();
+
+          try {
+            const stampMeta = await apiService.getStampMetadata(fileId);
+            if (addStampBlockToCanvas) {
+              addStampBlockToCanvas(stampMeta);
+              setTimeout(async () => {
+                try {
+                  saveCurrentPageState();
+                  const pagesData = preparePagesForSave();
+                  const formData = new FormData();
+                  formData.append('OriginalFileId', fileId);
+                  formData.append('editState', JSON.stringify(pagesData));
+                  await apiService.savePdfState(formData);
+                } catch (err) {
+                  console.error('Failed to auto-save stamp block', err);
+                }
+              }, 500);
+            }
+          } catch (e) {
+            console.warn('Failed to add auto stamp on URL load', e);
+          }
         }
       }
     } catch (error) {
       console.error('Failed to load PDF into workspace:', error);
       alert('Could not load the requested PDF.');
     }
-    return;
+    return true;
   }
 
 
@@ -1724,7 +1943,7 @@ const handleRouteChange = async () => {
     } catch (error) {
       console.error('Failed to load history instance from URL:', error);
     }
-    return;
+    return true;
   }
 
   if (currentPath === '/' || currentPath === '') {
@@ -1780,7 +1999,7 @@ onMounted(async () => {
     console.error('Failed to initialize store data:', error);
   }
 
-  await handleRouteChange();
+  const routeHandled = await handleRouteChange();
   window.addEventListener('popstate', handleRouteChange);
 
 
@@ -1791,16 +2010,19 @@ onMounted(async () => {
 
   setCanvasCallbacks({
     saveCurrentPageState,
-    forceUnlockObject
+    forceUnlockObject,
+    renderAllPages
   });
   setDocumentCallbacks({
     saveCurrentPageState,
     renderAllPages
   });
 
-  if (!pages.value || pages.value.length === 0)
-    pages.value = [{ id: 0, background: null, objects: [] }];
-  renderAllPages();
+  if (!routeHandled) {
+    if (!pages.value || pages.value.length === 0)
+      pages.value = [{ id: 0, background: null, objects: [] }];
+    renderAllPages();
+  }
 
   connectionStatus.value = 'connected';
 

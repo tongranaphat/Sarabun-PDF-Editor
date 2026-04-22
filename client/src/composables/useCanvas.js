@@ -137,11 +137,15 @@ export function useCanvas() {
       redoStack.value.push(current);
 
       const previous = historyStack.value[historyStack.value.length - 1];
-      canvas.value.loadFromJSON(JSON.parse(previous), () => {
+      canvas.value.loadFromJSON(JSON.parse(previous), async () => {
         canvas.value.renderAll();
         relinkSignatures();
         if (typeof _callbacks.saveCurrentPageState === 'function')
           _callbacks.saveCurrentPageState();
+
+        if (typeof _callbacks.renderAllPages === 'function') {
+          await _callbacks.renderAllPages();
+        }
 
         setTimeout(() => {
           isHistoryLocked.value = false;
@@ -156,11 +160,15 @@ export function useCanvas() {
       const next = redoStack.value.pop();
       historyStack.value.push(next);
 
-      canvas.value.loadFromJSON(JSON.parse(next), () => {
+      canvas.value.loadFromJSON(JSON.parse(next), async () => {
         canvas.value.renderAll();
         relinkSignatures();
         if (typeof _callbacks.saveCurrentPageState === 'function')
           _callbacks.saveCurrentPageState();
+
+        if (typeof _callbacks.renderAllPages === 'function') {
+          await _callbacks.renderAllPages();
+        }
 
         setTimeout(() => {
           isHistoryLocked.value = false;
@@ -328,11 +336,11 @@ export function useCanvas() {
   const addSignatureBlockToCanvas = (sigData, dropX = 100, dropY = 100) => {
     if (!canvas.value) return;
 
-    const maxTextWidth = 250;
-    const fontSize = 16;
+    const maxTextWidth = 145;
+    const fontSize = 13;
     const fontFamily = 'Sarabun';
 
-    const GAP = 30;
+    const GAP = 3;
 
     const sharedLinkedId = `link_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
@@ -350,7 +358,7 @@ export function useCanvas() {
         fontSize: fontSize,
         fontFamily: fontFamily,
         textAlign: 'center',
-        width: maxTextWidth + 20,
+        width: maxTextWidth + 10,
         originX: 'center',
         originY: 'top',
         id: `prefix_${sharedLinkedId}`,
@@ -369,7 +377,7 @@ export function useCanvas() {
       const balancer = new fabric.Rect({
         left: centerX,
         top: currentInternalY,
-        width: 250,
+        width: 145,
         height: 1,
         fill: 'transparent',
         originX: 'center',
@@ -379,13 +387,13 @@ export function useCanvas() {
       objects.push(balancer);
 
       if (imgObj) {
-        imgObj.scaleToHeight(45);
+        imgObj.scaleToHeight(30);
         imgObj.set({ originX: 'center', originY: 'top', top: currentInternalY, left: centerX });
         objects.push(imgObj);
 
-        currentInternalY += imgObj.getScaledHeight() + 20;
+        currentInternalY += imgObj.getScaledHeight() + 5;
       } else {
-        currentInternalY += 60;
+        currentInternalY += 30;
       }
 
       const nameText = new fabric.Text(`( ${sigData.fullName} )`, {
@@ -398,7 +406,7 @@ export function useCanvas() {
       });
       objects.push(nameText);
 
-      currentInternalY += nameText.height + 15;
+      currentInternalY += nameText.height + 2;
 
       if (sigData.position) {
         const wrappedPos =
@@ -527,7 +535,7 @@ export function useCanvas() {
 
     Object.values(pairs).forEach((pair) => {
       if (pair.prefix && pair.group) {
-        const GAP = pair.group.sigData?.signatureImage ? 10 : 30;
+        const GAP = pair.group.sigData?.signatureImage ? 3 : 3;
         linkSignatureBlocks(canvas.value, pair.prefix, pair.group, GAP);
       }
     });
@@ -614,11 +622,16 @@ export function useCanvas() {
     let dropY = 30;
 
     const allBgObjects = canvas.value.getObjects().filter(o => o.id === 'page-bg' || o.id === 'page-bg-image');
+    console.log('[STAMP-POS] BG objects found:', allBgObjects.length);
+    console.log('[STAMP-POS] All canvas objects:', canvas.value.getObjects().map(o => ({ id: o.id, type: o.type, left: o.left, top: o.top, w: o.getScaledWidth?.() })));
     if (allBgObjects.length > 0) {
       allBgObjects.sort((a, b) => a.top - b.top);
       const firstPage = allBgObjects[0];
       dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 20;
       dropY = firstPage.top + 30;
+      console.log('[STAMP-POS] Using BG position:', { bgLeft: firstPage.left, bgWidth: firstPage.getScaledWidth(), dropX, dropY });
+    } else {
+      console.log('[STAMP-POS] No BG found, using defaults:', { dropX, dropY, PAGE_WIDTH: CANVAS_CONSTANTS.PAGE_WIDTH });
     }
 
     const stampGroup = new fabric.Group(objects, {
@@ -634,6 +647,7 @@ export function useCanvas() {
     canvas.value.add(stampGroup);
     canvas.value.setActiveObject(stampGroup);
     canvas.value.requestRenderAll();
+    console.log('[STAMP-POS] Stamp group added at:', { left: stampGroup.left, top: stampGroup.top, w: stampGroup.width, h: stampGroup.height });
     
     if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
     saveHistory();

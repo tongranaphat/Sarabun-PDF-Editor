@@ -73,7 +73,7 @@
         <div v-if="activeTab === 'data'" class="tab-pane-data">
           <div class="data-section">
             <h4 class="label-small">ข้อความทั่วไป:</h4>
-            <button @click="handleAddCustomText" class="var-btn" :disabled="isPreviewMode" draggable="true"
+            <button @click="handleAddCustomText" class="var-btn" draggable="true"
               @dragstart="onCustomTextDragStart($event)">
               <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
               <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
@@ -85,8 +85,7 @@
             <div class="var-list">
               <button v-for="sig in signatories" :key="sig.id" draggable="true"
                 @dragstart="onSignatureDragStart($event, sig)" @click="$emit('add-signature-block', sig)"
-                class="var-btn" :disabled="isPreviewMode"
-                :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName">
+                class="var-btn" :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName">
                 <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                 <span class="var-btn-text">
                   {{ sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName }}
@@ -103,7 +102,7 @@
               <div v-for="(group, category) in groupedVariables" :key="category" class="var-group">
                 <h5 class="category-header">{{ category }}</h5>
                 <button v-for="v in group" :key="v.key" @click="$emit('add-variable', v.key)" draggable="true"
-                  @dragstart="onDragStart($event, v.key)" class="var-btn" :disabled="isPreviewMode">
+                  @dragstart="onDragStart($event, v.key)" class="var-btn">
                   <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                   <span class="var-btn-text">{{ v.label }}</span>
                 </button>
@@ -187,10 +186,8 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
-  isHistoryOpen: Boolean,
   connectionStatus: String,
   isCanvasReady: Boolean,
-  isPreviewMode: Boolean,
   pages: {
     type: Array,
     default: () => []
@@ -211,7 +208,6 @@ const emit = defineEmits([
   'import-workspace',
   'add-variable',
   'add-signature-block',
-  'open-history',
   'toggle',
   'open',
   'close',
@@ -361,14 +357,6 @@ const onCustomTextDragStart = (e) => {
   margin-bottom: 2px;
 }
 
-.icon-dashboard {
-  background-image: url('../assets/icons/dashboard.png');
-}
-
-.rail-btn.active .icon-dashboard {
-  background-image: url('../assets/icons/dashboard-active.png');
-}
-
 .icon-page {
   background-image: url('../assets/icons/page.png');
 }
@@ -447,10 +435,6 @@ const onCustomTextDragStart = (e) => {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-}
-
-.icon-dashboard-active {
-  background-image: url('../assets/icons/dashboard-active.png');
 }
 
 .icon-pages {
@@ -658,67 +642,6 @@ const onCustomTextDragStart = (e) => {
   align-items: center;
 }
 
-.history-section {
-  width: 298px;
-  padding-top: 15px;
-}
-
-.btn-history-header {
-  width: 81px;
-  height: 26px;
-  text-align: left;
-  font:
-    normal normal normal 20px/28px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #000000;
-  margin-bottom: 9px;
-  white-space: nowrap;
-}
-
-.btn-history {
-  width: 259px;
-  height: 40px;
-  background: #ffffff;
-  border: 1px solid #f65189;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 0;
-  transition: all 0.2s ease;
-}
-
-.btn-history-icon {
-  width: 16px;
-  height: 16px;
-  background: transparent url('../assets/icons/history.png') center/contain no-repeat;
-}
-
-.btn-history-text {
-  font:
-    normal normal bold 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #f65189;
-}
-
-.template-save-pane {
-  width: 298px;
-  min-height: 192px;
-  background: #f9f9f9 0% 0% no-repeat padding-box;
-  border: 1px solid #e8e8e8;
-  border-radius: 5px;
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 0 20px 0;
-  box-sizing: border-box;
-}
-
 .save-pane-inner {
   width: 268px;
   display: flex;
@@ -726,36 +649,6 @@ const onCustomTextDragStart = (e) => {
   align-items: flex-start;
 }
 
-.existing-templates-list {
-  width: 100%;
-}
-
-.template-list {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.template-item-title {
-  font:
-    normal normal bold 20px/28px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #000000;
-  margin-bottom: 5px;
-}
-
-.template-label-small {
-  width: 120px;
-  height: 24px;
-  text-align: left;
-  font:
-    normal normal normal 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #000000;
-  margin-top: 0px;
-}
 
 .label-small {
   width: 70px;
@@ -768,55 +661,6 @@ const onCustomTextDragStart = (e) => {
   color: #000000;
   margin-top: 0px;
   margin-bottom: 15px;
-}
-
-.template-name-input {
-  width: 268px;
-  height: 46px;
-  background: #ffffff 0% 0% no-repeat padding-box;
-  border: 1px solid #e3e3e3;
-  border-radius: 5px;
-  margin-top: 6px;
-  padding: 0 13px;
-  text-align: left;
-  font:
-    normal normal normal 14px/18px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #000000;
-  box-sizing: border-box;
-}
-
-.template-name-input::placeholder {
-  color: #bebebe;
-}
-
-.template-save-btn {
-  width: 268px;
-  height: 46px;
-  background: #f65189 0% 0% no-repeat padding-box;
-  border-radius: 5px;
-  border: none;
-  margin-top: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.template-save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.template-save-text {
-  height: 24px;
-  text-align: left;
-  font:
-    normal normal bold 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #ffffff;
 }
 
 .t-name {
@@ -838,14 +682,6 @@ const onCustomTextDragStart = (e) => {
   cursor: not-allowed;
 }
 
-.template-item-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding-bottom: 6px;
-}
-
 .btn-del {
   background: #e74c3c;
   border: none;
@@ -862,10 +698,6 @@ const onCustomTextDragStart = (e) => {
   transition: all 0.2s ease;
 }
 
-.template-item-row:hover .btn-del {
-  opacity: 1;
-  pointer-events: auto;
-}
 
 .icon-delete {
   width: 16px;
@@ -1123,41 +955,6 @@ select {
   background: #fff;
 }
 
-.template-save-btn:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(246, 81, 137, 0.2);
-}
-
-.btn-history:hover {
-  background: #fff5f8;
-}
-
-.btn-history.active {
-  background: #f65189;
-}
-
-.btn-history.active .btn-history-icon {
-  background: transparent url('../assets/icons/history.png') center/contain no-repeat;
-  filter: brightness(0) invert(1);
-}
-
-.btn-history.active .btn-history-text {
-  color: #ffffff;
-}
-
-.template-item-row:hover .t-name {
-  color: #f65189;
-  text-decoration: underline;
-}
-
-.btn-del:hover {
-  background: #f44336;
-  color: white;
-}
-
-
-
 .tab-pane-project {
   display: flex;
   flex-direction: column;
@@ -1172,8 +969,6 @@ select {
   flex-direction: column;
   margin-bottom: 20px;
 }
-
-
 
 .hint-text {
   text-align: left;
@@ -1479,14 +1274,5 @@ select {
   text-align: center;
   margin: 0;
   line-height: 1.2;
-}
-
-.icon-layers {
-  background-image: url('../assets/icons/layers.png');
-}
-
-.rail-btn.active .icon-layers,
-.rail-btn:hover .icon-layers {
-  background-image: url('../assets/icons/layers-active.png');
 }
 </style>

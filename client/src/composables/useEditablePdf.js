@@ -308,9 +308,9 @@ export function useEditablePdf() {
           const full =
             hex.length === 3
               ? hex
-                  .split('')
-                  .map((c) => c + c)
-                  .join('')
+                .split('')
+                .map((c) => c + c)
+                .join('')
               : hex;
           return rgb(
             parseInt(full.slice(0, 2), 16) / 255,
@@ -407,12 +407,12 @@ export function useEditablePdf() {
               try {
                 font.widthOfTextAtSize('\u0E01', fontSize);
                 canEncodeThai = true;
-              } catch {}
+              } catch { }
 
               if (!canEncodeThai) {
                 try {
                   font = await loadFont('Sarabun', weight, style);
-                } catch {}
+                } catch { }
               }
             }
 
@@ -459,7 +459,7 @@ export function useEditablePdf() {
                     font: fb,
                     color: textColor
                   });
-                } catch (e2) {}
+                } catch (e2) { }
               }
               currentY -= lineHeight;
             }
@@ -547,7 +547,7 @@ export function useEditablePdf() {
                 rotate: degrees(angleDeg),
                 opacity: obj.opacity ?? 1
               });
-            } catch (err) {}
+            } catch (err) { }
           }
         }
       }
@@ -559,146 +559,6 @@ export function useEditablePdf() {
       alert('PDF generation failed: ' + err.message);
       return null;
     }
-  };
-
-  const originalTemplates = new Map();
-
-  const backupTemplatesBeforePreview = (canvas, pages) => {
-    originalTemplates.clear();
-    if (!canvas || !pages) return;
-    canvas.getObjects().forEach((obj) => {
-      if (['textbox', 'text', 'i-text'].includes(obj.type) && obj.text) {
-        const objId = obj.id || `${obj.type}_${obj.left}_${obj.top}`;
-        originalTemplates.set(objId, {
-          text: obj.text,
-          editable: obj.editable,
-          selectable: obj.selectable,
-          evented: obj.evented
-        });
-      }
-    });
-  };
-
-  const restoreTemplatesAfterPreview = (canvas) => {
-    if (!canvas || originalTemplates.size === 0) return false;
-    let restored = 0;
-    let errors = 0;
-
-    canvas.getObjects().forEach((obj) => {
-      if (['textbox', 'text', 'i-text'].includes(obj.type)) {
-        const objId = obj.id || `${obj.type}_${obj.left}_${obj.top}`;
-        const backup = originalTemplates.get(objId);
-
-        if (backup) {
-          try {
-            obj.set('text', backup.text);
-            obj.set('editable', backup.editable);
-            obj.set('selectable', backup.selectable);
-            obj.set('evented', backup.evented);
-
-            if (obj.textBaseline === 'alphabetical') {
-              obj.set('textBaseline', 'alphabetic');
-            }
-            restored++;
-          } catch (e) {
-            errors++;
-          }
-        }
-      }
-    });
-    originalTemplates.clear();
-    return errors === 0;
-  };
-
-  const applyPreviewDataSafe = (canvas, mockData) => {
-    if (!canvas) return false;
-    try {
-      canvas.selection = false;
-      canvas.discardActiveObject();
-
-      canvas.getObjects().forEach((obj) => {
-        if (['textbox', 'text', 'i-text'].includes(obj.type) && obj.text) {
-          let newText = obj.text;
-          let hasVariables = false;
-
-          if (/\{\{[^}]+\}\}/.test(newText)) {
-            hasVariables = true;
-            Object.keys(mockData).forEach((key) => {
-              const regex = new RegExp(`{{${key}}}`, 'g');
-              newText = newText.replace(regex, mockData[key]);
-            });
-          }
-
-          if (hasVariables && newText !== obj.text) {
-            obj.set('text', newText);
-          }
-          obj.set('editable', false);
-        }
-
-        if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-          obj.set({
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            hasBorders: false
-          });
-        }
-      });
-
-      canvas.requestRenderAll();
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const togglePreviewWithRollback = async (
-    canvas,
-    isPreviewMode,
-    setIsPreviewMode,
-    mockData,
-    renderAllPages,
-    saveCurrentPageState
-  ) => {
-    if (!canvas) return false;
-    saveCurrentPageState();
-
-    const wasPreview = isPreviewMode.value;
-
-    try {
-      if (!wasPreview) {
-        backupTemplatesBeforePreview(canvas);
-        setIsPreviewMode(true);
-        await nextTick();
-        await renderAllPages();
-        const success = applyPreviewDataSafe(canvas, mockData);
-        if (!success) throw new Error('Failed to apply preview data');
-      } else {
-        restoreTemplatesAfterPreview(canvas);
-        setIsPreviewMode(false);
-        canvas.selection = true;
-        await nextTick();
-        await renderAllPages();
-      }
-      return true;
-    } catch (error) {
-      try {
-        if (!wasPreview) {
-          restoreTemplatesAfterPreview(canvas);
-          setIsPreviewMode(false);
-          canvas.selection = true;
-        } else {
-          setIsPreviewMode(true);
-        }
-        await nextTick();
-        await renderAllPages();
-      } catch (rollbackError) {}
-      return false;
-    }
-  };
-
-  const cleanup = () => {
-    originalTemplates.clear();
   };
 
   const createFontLoader = () => {
@@ -821,11 +681,6 @@ export function useEditablePdf() {
   return {
     generateHybridPdfBlob,
     createFontLoader,
-    captureCanvasPageSafe,
-    backupTemplatesBeforePreview,
-    restoreTemplatesAfterPreview,
-    applyPreviewDataSafe,
-    togglePreviewWithRollback,
-    cleanup
+    captureCanvasPageSafe
   };
 }

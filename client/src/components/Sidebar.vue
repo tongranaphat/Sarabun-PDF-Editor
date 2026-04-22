@@ -8,7 +8,7 @@
           { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
         ]">
           <span class="rail-icon icon-page"></span>
-          <span class="rail-label">หน้า</span>
+          <span class="rail-label">หน้าหนังสือ</span>
         </button>
 
         <button @click="handleTabClick('data')" @mouseenter="handleMouseEnter('data')" :class="[
@@ -16,7 +16,7 @@
           { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
         ]">
           <span class="rail-icon icon-data"></span>
-          <span class="rail-label">ข้อมูล</span>
+          <span class="rail-label">ข้อมูลเกษียณ</span>
         </button>
 
         <button @click="handleTabClick('assets')" @mouseenter="handleMouseEnter('assets')" :class="[
@@ -46,12 +46,12 @@
 
         <div class="panel-header-title" v-if="activeTab === 'pages'">
           <span class="panel-header-icon icon-pages"></span>
-          <h3 class="panel-header-text">จัดการหน้ากระดาษ</h3>
+          <h3 class="panel-header-text">จัดการหน้าหนังสือ</h3>
         </div>
 
         <div class="panel-header-title" v-if="activeTab === 'data'">
           <span class="panel-header-icon icon-data-header"></span>
-          <h3 class="panel-header-text">จัดการข้อมูล</h3>
+          <h3 class="panel-header-text">ข้อมูลเกษียณ</h3>
         </div>
 
 
@@ -239,10 +239,10 @@
       <div class="panel-footer" v-if="activeTab === 'pages'">
         <div class="add-page-actions-sidebar">
           <button class="add-pg-btn" @click="isCanvasReady ? $emit('add-page') : null" :disabled="!isCanvasReady">
-            + เพิ่มหน้าว่างใหม่
+            + เพิ่มหน้าใหม่
           </button>
-          <input type="file" ref="appendInput" @change="onAppendFileChange"
-            accept="application/pdf" style="display: none" />
+          <input type="file" ref="appendInput" @change="onAppendFileChange" accept="application/pdf"
+            style="display: none" />
           <button class="add-pg-btn secondary" @click="triggerAppendUpload" :disabled="!isCanvasReady">
             + นำเข้าหน้าใหม่
           </button>

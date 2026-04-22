@@ -2,7 +2,7 @@
   <header class="top-navbar">
     <div class="navbar-left">
       <h1 class="app-title" @click="$emit('go-home')" style="cursor: pointer" title="หน้าหลัก">
-        ระบบจัดการเอกสาร
+        ระบบสารบรรณ
       </h1>
     </div>
 

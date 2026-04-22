@@ -1,21 +1,17 @@
 <template>
   <div class="app-layout">
     <TopNavbar :zoom-level="zoomLevel" :is-preview-mode="isPreviewMode" :is-generating="isGenerating"
-      :pdf-quality="pdfQuality" @go-home="goHome"
-      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut"
-      @save-report="handleSaveProject" @generate-pdf="handleExport"
-      @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
+      :pdf-quality="pdfQuality" @go-home="goHome" @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut"
+      @save-report="handleSaveProject" @generate-pdf="handleExport" @reset-project="handleReset"
+      @update:pdfQuality="pdfQuality = $event" />
 
     <Sidebar :isOpen="isSidebarOpen" :is-history-open="showHistoryModal" :connectionStatus="connectionStatus"
-      :isCanvasReady="isCanvasReady" :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables"
-      :pages="pages" :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
-      @close="isSidebarOpen = false" @reset-canvas="goHome"
-      @import-workspace="handleImportWorkspaceWrapper"
-      @add-variable="handleAddVariable"
-      @open-history="openHistoryModal" @delete-page="deletePage"
+      :isCanvasReady="isCanvasReady" :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables" :pages="pages"
+      :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
+      @close="isSidebarOpen = false" @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper"
+      @add-variable="handleAddVariable" @open-history="openHistoryModal" @delete-page="deletePage"
       @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
-      @page-drop="handlePageDrop"
-      @add-signature-block="handleAddSignatureBlock"
+      @page-drop="handlePageDrop" @add-signature-block="handleAddSignatureBlock"
       @add-custom-variable="addCustomVariable" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
@@ -48,7 +44,6 @@ import { fabric } from 'fabric';
 import TopNavbar from '../components/TopNavbar.vue';
 import PropertiesPanel from '../components/PropertiesPanel.vue';
 import Sidebar from '../components/Sidebar.vue';
-import HistoryModal from '../components/HistoryModal.vue';
 import ExportOverlay from '../components/ExportOverlay.vue';
 
 import { useCanvas } from '../composables/useCanvas';

@@ -5,14 +5,13 @@
       @save-report="handleSaveProject" @generate-pdf="handleExport" @reset-project="handleReset"
       @update:pdfQuality="pdfQuality = $event" />
 
-    <Sidebar :isOpen="isSidebarOpen" :is-history-open="showHistoryModal" :connectionStatus="connectionStatus"
-      :isCanvasReady="isCanvasReady" :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables" :pages="pages"
+    <Sidebar :isOpen="isSidebarOpen" :connectionStatus="connectionStatus" :isCanvasReady="isCanvasReady"
+      :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables" :pages="pages"
       :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
       @close="isSidebarOpen = false" @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper"
-      @add-variable="handleAddVariable" @open-history="openHistoryModal" @delete-page="deletePage"
-      @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
-      @page-drop="handlePageDrop" @add-signature-block="handleAddSignatureBlock"
-      @add-custom-variable="addCustomVariable" />
+      @add-variable="handleAddVariable" @delete-page="deletePage" @add-page="addBlankPageWrapper"
+      @import-page="handleAppendPageWrapper" @page-click="scrollToPage" @page-drop="handlePageDrop"
+      @add-signature-block="handleAddSignatureBlock" @add-custom-variable="addCustomVariable" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
       <div class="scroll-center-helper">
@@ -29,9 +28,6 @@
     <div v-if="canvas" class="floating-panel-anchor" :class="{ 'sidebar-closed': !isSidebarOpen }">
       <PropertiesPanel :canvas="canvas" :is-preview-mode="isPreviewMode" />
     </div>
-
-    <HistoryModal v-if="showHistoryModal" :reportInstances="reportHistory" :currentInstanceId="currentReportId"
-      @close="showHistoryModal = false" @edit="openReportFromHistory" @delete="handleDeleteReport" />
 
     <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
       :total="exportOverlay.total" :stage="exportOverlay.stage" />
@@ -132,11 +128,6 @@ const fetchReports = async () => {
   }
 };
 
-const openHistoryModal = async () => {
-  await fetchReports();
-  showHistoryModal.value = true;
-};
-
 const openReportFromHistory = async (instance) => {
   if (!confirm('การดำเนินการนี้จะแทนที่โปรเจกต์ปัจจุบัน คุณต้องการดำเนินการต่อหรือไม่?')) return;
   try {
@@ -163,7 +154,6 @@ const openReportFromHistory = async (instance) => {
   } catch (e) {
     alert('โหลดรายงานล้มเหลว: ' + e.message);
   }
-  showHistoryModal.value = false;
 };
 
 const handleDeleteReport = async (instance) => {
@@ -254,7 +244,6 @@ const handleUrlImport = async (url) => {
   }
 };
 
-const showHistoryModal = ref(false);
 const reportHistory = ref([]);
 
 const {

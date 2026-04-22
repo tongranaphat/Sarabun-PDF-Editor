@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+ARG VITE_API_PORT=4011
+ENV VITE_API_PORT=${VITE_API_PORT}
 RUN npm run build
 
 FROM nginx:stable-alpine as production-stage

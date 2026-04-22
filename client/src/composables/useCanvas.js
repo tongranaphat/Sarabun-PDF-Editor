@@ -492,7 +492,7 @@ export function useCanvas() {
     if (sigData.signatureImage) {
       let imageUrl = sigData.signatureImage;
       if (imageUrl.includes('uploads/')) {
-        const backendPort = 4010;
+        const backendPort = import.meta.env.VITE_API_PORT || '4011';
         const protocol = window.location.protocol;
         const hostname = window.location.hostname;
         if (!imageUrl.startsWith('/')) imageUrl = '/' + imageUrl;
@@ -531,6 +531,112 @@ export function useCanvas() {
         linkSignatureBlocks(canvas.value, pair.prefix, pair.group, GAP);
       }
     });
+  };
+
+  const addStampBlockToCanvas = (metadata) => {
+    if (!canvas.value) return;
+
+    const { schoolName, seqNo, date, time, receiverName } = metadata;
+
+    const objects = [];
+    const fontFamily = 'Sarabun';
+    const fontSize = 10;
+    let currentY = 8;
+
+    const fieldsData = [
+      { label: 'เลขที่รับ', val: String(seqNo || '') },
+      { label: 'วันที่', val: date || '' },
+      { label: 'เวลา', val: time || '' },
+      { label: 'ผู้รับ', val: receiverName || '' }
+    ];
+
+    let maxValWidth = 60;
+    const labels = [];
+    const values = [];
+
+    fieldsData.forEach(field => {
+      const labelItem = new fabric.Text(field.label, { fontSize, fontFamily, fill: '#000000' });
+      const valItem = new fabric.Text(field.val, { fontSize: fontSize + 1, fontFamily, fill: '#000000' });
+      labels.push(labelItem);
+      values.push(valItem);
+      if (valItem.width > maxValWidth) {
+        maxValWidth = valItem.width;
+      }
+    });
+
+    const dynamicBoxWidth = 60 + maxValWidth + 20;
+    const blockWidth = Math.max(160, dynamicBoxWidth);
+
+    const schoolText = new fabric.Text(schoolName || 'โรงเรียนทดสอบ', {
+      fontSize: fontSize + 1,
+      fontFamily: fontFamily,
+      fontWeight: 'bold',
+      fill: '#000000',
+      left: blockWidth / 2,
+      top: currentY,
+      originX: 'center',
+      originY: 'top',
+    });
+    objects.push(schoolText);
+    currentY += schoolText.height + 5;
+
+    for (let i = 0; i < fieldsData.length; i++) {
+      const labelItem = labels[i];
+      const valItem = values[i];
+
+      labelItem.set({ left: 10, top: currentY });
+      const valCenter = 60 + (blockWidth - 10 - 60) / 2;
+      valItem.set({ 
+        left: valCenter, 
+        top: currentY - 1, 
+        originX: 'center', 
+        originY: 'top' 
+      });
+
+      objects.push(labelItem, valItem);
+      currentY += Math.max(labelItem.height, valItem.height) + 5;
+    }
+
+    const frame = new fabric.Rect({
+      left: 0,
+      top: 0,
+      width: blockWidth,
+      height: currentY + 3,
+      fill: 'transparent',
+      stroke: '#000000',
+      strokeWidth: 1.0,
+      rx: 2,
+      ry: 2
+    });
+    objects.unshift(frame);
+
+    let dropX = CANVAS_CONSTANTS.PAGE_WIDTH - blockWidth - 20;
+    let dropY = 30;
+
+    const allBgObjects = canvas.value.getObjects().filter(o => o.id === 'page-bg' || o.id === 'page-bg-image');
+    if (allBgObjects.length > 0) {
+      allBgObjects.sort((a, b) => a.top - b.top);
+      const firstPage = allBgObjects[0];
+      dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 20;
+      dropY = firstPage.top + 30;
+    }
+
+    const stampGroup = new fabric.Group(objects, {
+      left: dropX,
+      top: dropY,
+      originX: 'left',
+      originY: 'top',
+      isSignatureBlock: true,
+      id: `stamp_${Date.now()}`,
+      name: `บล็อกเลขที่รับ`
+    });
+
+    canvas.value.add(stampGroup);
+    canvas.value.setActiveObject(stampGroup);
+    canvas.value.requestRenderAll();
+    
+    if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
+    saveHistory();
   };
 
   const addImageToCanvas = async (url, x = 100, y = 100) => {
@@ -986,6 +1092,7 @@ export function useCanvas() {
     dispose,
 
     addSignatureBlockToCanvas,
+    addStampBlockToCanvas,
     updateCanvasDimensions,
     relinkSignatures
   };

@@ -8,7 +8,8 @@ if (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1')) {
   envApiUrl = '/api';
 }
 
-const API_BASE = `${currentOrigin.replace(/:\d+$/, '')}:4010${envApiUrl}`;
+const BACKEND_PORT = import.meta.env.VITE_API_PORT || '4011';
+const API_BASE = `${currentOrigin.replace(/:\d+$/, '')}:${BACKEND_PORT}${envApiUrl}`;
 const BACKEND_BASE = API_BASE.replace('/api', '');
 
 const api = axios.create({
@@ -56,36 +57,8 @@ export const apiService = {
     return response.data;
   },
 
-  async getTemplates(userId = null) {
-    const params = userId ? { userId } : {};
-    const response = await api.get('/templates', { params });
-    return response.data;
-  },
 
-  async getTemplateById(id) {
-    const response = await api.get(`/templates/${id}`);
-    return response.data;
-  },
 
-  async saveTemplate(templateData) {
-    const response = await api.post('/templates', templateData);
-    return response.data;
-  },
-
-  async updateTemplate(id, templateData) {
-    const response = await api.put(`/templates/${id}`, templateData);
-    return response.data;
-  },
-
-  async deleteTemplate(id) {
-    const response = await api.delete(`/templates/${id}`);
-    return response.data;
-  },
-
-  async cloneTemplate(id) {
-    const response = await api.post(`/templates/${id}/clone`);
-    return response.data;
-  },
 
   async getReports() {
     const response = await api.get('/reports');
@@ -177,6 +150,12 @@ export const apiService = {
     return response.data;
   },
 
+  async getStampMetadata(fileId = null) {
+    const url = fileId ? `/pdf/stamp-metadata?fileId=${fileId}` : '/pdf/stamp-metadata';
+    const response = await api.get(url);
+    return response.data;
+  },
+
   async resetToOriginal(id) {
     const response = await api.post(`/pdf/reset/${id}`);
     return response.data;
@@ -214,6 +193,21 @@ export const apiService = {
 
   getBackendBase() {
     return BACKEND_BASE;
+  },
+
+  async getStampConfig() {
+    const response = await api.get('/stamp-config');
+    return response.data;
+  },
+
+  async updateStampConfig(id, data) {
+    const response = await api.put(`/stamp-config/${id}`, data);
+    return response.data;
+  },
+
+  async createStampConfig(data) {
+    const response = await api.post('/stamp-config', data);
+    return response.data;
   }
 };
 

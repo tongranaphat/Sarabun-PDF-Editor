@@ -14,6 +14,7 @@ COPY . .
 
 RUN npx prisma generate
 
-EXPOSE 4010
+ARG SERVER_PORT=4011
+EXPOSE ${SERVER_PORT}
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss 2>&1 || echo 'Prisma push warning (non-fatal)'; exec node index.js"]

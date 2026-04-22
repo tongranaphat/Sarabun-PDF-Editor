@@ -11,12 +11,13 @@ require('dotenv').config();
 const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 
-const templateRoutes = require('./routes/templateRoutes');
+const variableRoutes = require('./routes/variableRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const reportInstanceRoutes = require('./routes/reportInstanceRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const assetRoutes = require('./routes/assetRoutes');
 const signatoryRoutes = require('./routes/signatoryRoutes');
+const stampConfigRoutes = require('./routes/stampConfigRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -61,17 +62,18 @@ app.use(
 app.get('/', (req, res) => {
     res.status(200).json({
         status: 'success',
-        message: 'Dynamic Report API is running perfectly! 🚀',
+        message: 'Dynamic Report API is running perfectly!',
         endpoints: '/api'
     });
 });
 
 app.use('/api', healthRoutes);
-app.use('/api', templateRoutes);
+app.use('/api', variableRoutes);
 app.use('/api', pdfRoutes);
 app.use('/api', reportInstanceRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api', signatoryRoutes);
+app.use('/api', stampConfigRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -81,9 +83,9 @@ const startServer = async () => {
         await prisma.$connect();
         logger.success('Connected to Database');
 
-        const PORT = process.env.PORT || 4010;
+        const PORT = process.env.PORT || 4011;
 
-        server.listen(PORT, () => {
+        server.listen(PORT, "0.0.0.0", () => {
             logger.success(`Server running on port ${PORT}`);
             logger.info(`API Documentation: http://localhost:${PORT}/api`);
         });

@@ -2,13 +2,12 @@ const prisma = require('../prismaClient');
 const { asyncHandler } = require('../utils/errorHandler');
 
 const saveReport = asyncHandler(async (req, res) => {
-    const { id, name, pages, templateId, status, projectData, filePath, data, pdfUrl } = req.body;
+    const { id, name, pages, status, projectData, filePath, data, pdfUrl } = req.body;
 
     let report;
 
     const finalName = name || projectData?.name || 'Untitled Report';
     const finalPages = pages || projectData?.pages || [];
-    const finalTemplateId = templateId || projectData?.templateId || null;
 
     if (id) {
         const existing = await prisma.reportInstance.findUnique({ where: { id } });
@@ -19,7 +18,6 @@ const saveReport = asyncHandler(async (req, res) => {
                 data: {
                     name: finalName,
                     pages: finalPages,
-                    templateId: finalTemplateId,
                     status: status || 'DRAFT',
                     data: data || undefined,
                     pdfUrl: pdfUrl || undefined,
@@ -32,7 +30,6 @@ const saveReport = asyncHandler(async (req, res) => {
                     id: id,
                     name: finalName,
                     pages: finalPages,
-                    templateId: finalTemplateId,
                     status: 'DRAFT',
                     data: data || undefined,
                     pdfUrl: pdfUrl || undefined
@@ -44,7 +41,6 @@ const saveReport = asyncHandler(async (req, res) => {
             data: {
                 name: finalName,
                 pages: finalPages,
-                templateId: finalTemplateId,
                 status: 'DRAFT',
                 data: data || undefined,
                 pdfUrl: pdfUrl || undefined
@@ -59,12 +55,7 @@ const getReportById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     const report = await prisma.reportInstance.findUnique({
-        where: { id },
-        include: {
-            template: {
-                select: { name: true }
-            }
-        }
+        where: { id }
     });
 
     if (!report) {
@@ -77,12 +68,7 @@ const getReportById = asyncHandler(async (req, res) => {
 
 const getAllReports = asyncHandler(async (req, res) => {
     const reports = await prisma.reportInstance.findMany({
-        orderBy: { updatedAt: 'desc' },
-        include: {
-            template: {
-                select: { name: true }
-            }
-        }
+        orderBy: { updatedAt: 'desc' }
     });
     res.json(reports);
 });

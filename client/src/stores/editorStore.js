@@ -16,13 +16,12 @@ const getMachineId = () => {
 
 export const useEditorStore = defineStore('editor', () => {
   const variables = ref([]);
-  const templates = ref([]);
   const pages = ref([{ id: 0, background: null, objects: [] }]);
   const currentPageIndex = ref(0);
 
-  const currentTemplateId = ref(null);
+  const currentDocumentId = ref(null);
   const currentReportId = ref(null);
-  const templateName = ref('');
+  const documentTitle = ref('');
   const isPreviewMode = ref(false);
   const isSidebarOpen = ref(false);
 
@@ -48,16 +47,6 @@ export const useEditorStore = defineStore('editor', () => {
     }
   };
 
-  const fetchTemplates = async () => {
-    try {
-      const machineId = getMachineId();
-      const data = await apiService.getTemplates(machineId);
-      templates.value = data;
-    } catch (e) {
-      console.error('Failed to fetch templates:', e);
-    }
-  };
-
   const addBlankPage = () => {
     const insertIndex = currentPageIndex.value + 1;
     pages.value.splice(insertIndex, 0, { id: Date.now(), background: null, objects: [] });
@@ -72,9 +61,9 @@ export const useEditorStore = defineStore('editor', () => {
   };
 
   const resetState = () => {
-    currentTemplateId.value = null;
+    currentDocumentId.value = null;
     currentReportId.value = null;
-    templateName.value = '';
+    documentTitle.value = '';
     isPreviewMode.value = false;
     pages.value = [{ id: Date.now(), background: null, objects: [] }];
     currentPageIndex.value = 0;
@@ -82,19 +71,17 @@ export const useEditorStore = defineStore('editor', () => {
 
   return {
     variables,
-    templates,
     pages,
     currentPageIndex,
-    currentTemplateId,
+    currentDocumentId,
     currentReportId,
-    templateName,
+    documentTitle,
     isPreviewMode,
     isSidebarOpen,
 
     groupedVariables,
 
     fetchVariables,
-    fetchTemplates,
     addBlankPage,
     deletePage,
     resetState,

@@ -111,22 +111,6 @@ export const apiService = {
     return response.data;
   },
 
-  async getAssets() {
-    const response = await api.get('/assets');
-    return response.data;
-  },
-
-  async uploadAsset(formData) {
-    const response = await api.post('/assets/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data;
-  },
-
-  async deleteAsset(id) {
-    const response = await api.delete(`/assets/${id}`);
-    return response.data;
-  },
 
   async importPdfFromUrl(url) {
     const response = await api.post('/pdf/import-url', { url });

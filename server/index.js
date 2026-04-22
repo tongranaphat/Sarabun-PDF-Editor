@@ -15,7 +15,7 @@ const variableRoutes = require('./routes/variableRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const reportInstanceRoutes = require('./routes/reportInstanceRoutes');
 const healthRoutes = require('./routes/healthRoutes');
-const assetRoutes = require('./routes/assetRoutes');
+
 const signatoryRoutes = require('./routes/signatoryRoutes');
 const stampConfigRoutes = require('./routes/stampConfigRoutes');
 
@@ -71,7 +71,7 @@ app.use('/api', healthRoutes);
 app.use('/api', variableRoutes);
 app.use('/api', pdfRoutes);
 app.use('/api', reportInstanceRoutes);
-app.use('/api/assets', assetRoutes);
+
 app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
 

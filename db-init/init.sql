@@ -49,15 +49,7 @@ CREATE TABLE IF NOT EXISTS public."ReportInstance" (
     "updatedAt" timestamp(3) without time zone NOT NULL
 );
 
--- Asset
-CREATE TABLE IF NOT EXISTS public."Asset" (
-    id text NOT NULL,
-    filename text NOT NULL,
-    mimetype text NOT NULL,
-    filepath text NOT NULL,
-    url text NOT NULL,
-    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
+
 
 -- PdfCache
 CREATE TABLE IF NOT EXISTS public."PdfCache" (
@@ -114,10 +106,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
-DO $$ BEGIN
-    ALTER TABLE ONLY public."Asset" ADD CONSTRAINT "Asset_pkey" PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+
 
 DO $$ BEGIN
     ALTER TABLE ONLY public."PdfCache" ADD CONSTRAINT "PdfCache_pkey" PRIMARY KEY ("OriginalFileId");
@@ -162,12 +151,7 @@ END $$;
 -- Sample Data (ข้อมูลเริ่มต้น)
 -- ============================================
 
--- Assets
-INSERT INTO public."Asset" (id, filename, mimetype, filepath, url, "createdAt") VALUES
-('c8a2f033-e53a-4da6-b2f9-a60172a13e3e', '1774863860446-reference_crops_forcep1.png', 'image/png', '/uploads/assets/1774863860446-reference_crops_forcep1.png', 'http://localhost:4011/uploads/assets/1774863860446-reference_crops_forcep1.png', '2026-03-30 09:44:20.453'),
-('88e71e83-31df-44c5-9f52-9a1f0568b787', '1774928291327-reference_crops_plier.png', 'image/png', '/uploads/assets/1774928291327-reference_crops_plier.png', 'http://localhost:4011/uploads/assets/1774928291327-reference_crops_plier.png', '2026-03-31 03:38:11.331'),
-('e9366bb1-9905-4a2b-a730-ca3c569fc7e9', '1775640614831-signature.png', 'image/png', '/uploads/assets/1775640614831-signature.png', 'http://localhost:4011/uploads/assets/1775640614831-signature.png', '2026-04-08 09:30:14.835')
-ON CONFLICT (id) DO NOTHING;
+
 
 -- Signatories
 INSERT INTO public."Signatory" (id, "fullName", "signatureImage", "variableName", "prefixText", "position", "createdAt") VALUES

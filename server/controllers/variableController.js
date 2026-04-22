@@ -3,10 +3,10 @@ const { asyncHandler } = require('../utils/errorHandler');
 
 const logger = {
     info: (message, ...args) => {
-        console.info(`[TEMPLATE] ${new Date().toISOString()} - ${message}`, ...args);
+        console.info(`[VARIABLE] ${new Date().toISOString()} - ${message}`, ...args);
     },
     error: (message, error) => {
-        console.error(`[TEMPLATE ERROR] ${new Date().toISOString()} - ${message}`);
+        console.error(`[VARIABLE ERROR] ${new Date().toISOString()} - ${message}`);
         if (error) {
             console.error('Error details:', error.message || error);
             if (error.stack) {
@@ -14,40 +14,9 @@ const logger = {
             }
         }
     },
-    warn: (message, ...args) => {
-        console.warn(`[TEMPLATE WARN] ${new Date().toISOString()} - ${message}`, ...args);
-    },
     success: (message, ...args) => {
-        console.info(`[TEMPLATE] ${new Date().toISOString()} - ${message}`, ...args);
+        console.info(`[VARIABLE] ${new Date().toISOString()} - ${message}`, ...args);
     }
-};
-
-const formatTemplate = (t) => {
-    return {
-        _id: t.id,
-        id: t.id,
-        name: t.name,
-        background: t.background,
-        pages: t.pages || [],
-        isMaster: t.isMaster,
-        ownerId: t.ownerId,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt
-    };
-};
-
-const ensureUserExists = async (userId) => {
-    if (!userId) return null;
-    const user = await prisma.user.upsert({
-        where: { id: userId },
-        update: {},
-        create: {
-            id: userId,
-            username: userId,
-            password: 'auto-generated-password'
-        }
-    });
-    return user ? user.id : null;
 };
 
 const getVariables = asyncHandler(async (req, res) => {
@@ -116,127 +85,6 @@ const getVariables = asyncHandler(async (req, res) => {
     res.json(categorizedVariables);
 });
 
-const getTemplates = asyncHandler(async (req, res) => {
-    logger.info('Fetching templates');
-    const templates = await prisma.template.findMany({
-        orderBy: { updatedAt: 'desc' }
-    });
-
-    const formatted = templates.map(formatTemplate);
-    logger.success(`Retrieved ${formatted.length} templates`);
-    res.json(formatted);
-});
-
-const getTemplateById = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const template = await prisma.template.findUnique({ where: { id } });
-
-    if (!template) {
-        res.status(404);
-        throw new Error('Template not found');
-    }
-
-    res.json(formatTemplate(template));
-});
-
-const saveTemplate = asyncHandler(async (req, res) => {
-    const { name, background, pages, userId } = req.body;
-
-    logger.info(`Saving new template: ${name}`);
-
-    let ownerId = null;
-    if (userId) {
-        ownerId = await ensureUserExists(userId);
-    }
-
-    const newTemplate = await prisma.template.create({
-        data: {
-            name: name,
-            background: background,
-            pages: pages,
-            ownerId: ownerId,
-            isMaster: true
-        }
-    });
-
-    logger.success(`Template saved with ID: ${newTemplate.id}`);
-
-    res.send({ status: 'ok', id: newTemplate.id });
-});
-
-const updateTemplate = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { name, background, pages } = req.body;
-
-    logger.info(`Updating template: ${id}`);
-
-    const updated = await prisma.template.update({
-        where: { id },
-        data: {
-            name,
-            background,
-            pages,
-            updatedAt: new Date()
-        }
-    });
-
-    logger.success(`Template updated: ${updated.id}`);
-
-    res.json({ status: 'ok', id: updated.id });
-});
-
-const cloneTemplate = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    logger.info(`Cloning template: ${id}`);
-
-    const original = await prisma.template.findUnique({ where: { id } });
-    if (!original) {
-        res.status(404);
-        throw new Error('Template not found');
-    }
-
-    const newTemplate = await prisma.template.create({
-        data: {
-            name: `${original.name} (Copy)`,
-            background: original.background,
-            pages: original.pages,
-            originTemplateId: original.id,
-            ownerId: original.ownerId
-        }
-    });
-
-    logger.success(`Template cloned: ${newTemplate.id}`);
-    res.json({ status: 'ok', id: newTemplate.id });
-});
-
-const deleteTemplate = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    const template = await prisma.template.findUnique({ where: { id } });
-
-    if (!template) {
-        res.status(404);
-        throw new Error('Template not found');
-    }
-
-    const fs = require('fs');
-    const pathMod = require('path');
-
-    if (template.preview) {
-        const previewPath = pathMod.join(__dirname, '..', template.preview);
-        try {
-            fs.unlinkSync(previewPath);
-        } catch (e) {
-            console.warn(`[deleteTemplate] Could not unlink preview ${previewPath}:`, e.message);
-        }
-    }
-
-    await prisma.template.delete({ where: { id } });
-    logger.success(`Template deleted: ${id}`);
-
-    res.json({ status: 'ok' });
-});
-
 const addVariable = asyncHandler(async (req, res) => {
     const { key, label } = req.body;
     const newVar = await prisma.variable.create({
@@ -277,12 +125,6 @@ const seedDatabase = asyncHandler(async (req, res) => {
 
 module.exports = {
     getVariables,
-    getTemplates,
-    getTemplateById,
-    saveTemplate,
-    updateTemplate,
-    deleteTemplate,
-    cloneTemplate,
     addVariable,
     seedDatabase
 };

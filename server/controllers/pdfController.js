@@ -188,6 +188,19 @@ const autoImportUniversal = async (req, res) => {
         const { url } = req.body;
         if (!url) return res.status(400).json({ error: 'URL is required' });
 
+        let cachedPdf = await prisma.pdfCache.findFirst({
+            where: { OriginalUrlorPath: url }
+        });
+
+        if (cachedPdf) {
+            return res.status(200).json({
+                ...cachedPdf,
+                id: cachedPdf.OriginalFileId,
+                fileId: cachedPdf.OriginalFileId,
+                filepath: cachedPdf.FilePath
+            });
+        }
+
         const downloadUrl = convertGDriveUrl(url);
 
         const response = await axios.get(downloadUrl, { responseType: 'stream' });
@@ -215,7 +228,7 @@ const autoImportUniversal = async (req, res) => {
             writer.on('error', reject);
         });
 
-        const cachedPdf = await prisma.pdfCache.create({
+        cachedPdf = await prisma.pdfCache.create({
             data: {
                 FileName: exactName,
                 OriginalUrlorPath: url,
@@ -485,6 +498,20 @@ const generatePDF = asyncHandler(async (req, res) => {
 const uploadPdf = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const existingPdf = await prisma.pdfCache.findFirst({
+            where: { FileName: req.file.originalname },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (existingPdf) {
+            return res.status(200).json({ 
+                ...existingPdf, 
+                id: existingPdf.OriginalFileId, 
+                filepath: existingPdf.FilePath 
+            });
+        }
+
         const filepath = `/uploads/original/cache/${req.file.filename}`;
 
         const savedPdf = await prisma.pdfCache.create({
@@ -641,6 +668,19 @@ const importLocalPath = async (req, res) => {
             return res.status(404).json({ error: 'File not found: ' + normalizedPath });
         }
 
+        const existingPdf = await prisma.pdfCache.findFirst({
+            where: { FileName: path.basename(normalizedPath) },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (existingPdf) {
+            return res.status(200).json({
+                ...existingPdf,
+                filepath: existingPdf.FilePath,
+                id: existingPdf.OriginalFileId
+            });
+        }
+
         const fileName = `local_${Date.now()}_${path.basename(normalizedPath)}`;
         const uploadDir = path.join(__dirname, '../uploads/original/cache');
         if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -730,6 +770,53 @@ const cleanupTempFile = async (req, res) => {
     }
 };
 
+const getStampMetadata = async (req, res) => {
+    try {
+        const { fileId } = req.query;
+        if (!fileId) {
+            return res.status(400).json({ error: 'fileId is required' });
+        }
+
+        const pdf = await prisma.pdfCache.findUnique({ where: { OriginalFileId: fileId } });
+        if (!pdf) {
+            return res.status(404).json({ error: 'ไม่พบไฟล์ PDF ในระบบ' });
+        }
+
+        let stampConfig = await prisma.stampConfig.findUnique({ where: { pdfCacheId: fileId } });
+
+        if (!stampConfig) {
+            const lastStamp = await prisma.stampConfig.findFirst({ orderBy: { seqNo: 'desc' } });
+            const nextSeqNo = lastStamp ? lastStamp.seqNo + 1 : 1;
+
+            stampConfig = await prisma.stampConfig.create({
+                data: {
+                    pdfCacheId: fileId,
+                    seqNo: nextSeqNo,
+                    schoolName: 'โรงเรียนทดสอบ'
+                }
+            });
+        }
+
+        const user = await prisma.user.findFirst();
+        const receiverName = user ? user.username : 'ไม่ระบุ';
+
+        const targetDate = stampConfig.createdAt;
+        const thDate = targetDate.toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' });
+        const thTime = targetDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '.') + ' น.';
+
+        res.json({
+            schoolName: stampConfig.schoolName,
+            seqNo: stampConfig.seqNo,
+            date: thDate,
+            time: thTime,
+            receiverName: receiverName
+        });
+    } catch (error) {
+        console.error('[getStampMetadata] Error:', error);
+        res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลแสตมป์ได้' });
+    }
+};
+
 module.exports = {
     upload,
     checkPdfType,
@@ -744,5 +831,6 @@ module.exports = {
     saveGeneratedPdfState,
     prepareWorkspace,
     resetToOriginal,
-    cleanupTempFile
+    cleanupTempFile,
+    getStampMetadata
 };

@@ -2,80 +2,38 @@
   <aside class="sidebar-container" @mouseleave="handleMouseLeave">
     <div class="sidebar-rail">
       <div class="rail-items">
-        <button
-          @click="handleTabClick('templates')"
-          @mouseenter="handleMouseEnter('templates')"
-          :class="[
-            'rail-btn',
-            {
-              active: activeTab === 'templates' && isOpen,
-              pinned: isPinned && activeTab === 'templates'
-            }
-          ]"
-        >
-          <span class="rail-icon icon-dashboard"></span>
-          <span class="rail-label">เทมเพลต</span>
-        </button>
 
-        <button
-          @click="handleTabClick('pages')"
-          @mouseenter="handleMouseEnter('pages')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
-          ]"
-        >
+        <button @click="handleTabClick('pages')" @mouseenter="handleMouseEnter('pages')" :class="[
+          'rail-btn',
+          { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
+        ]">
           <span class="rail-icon icon-page"></span>
           <span class="rail-label">หน้า</span>
         </button>
 
-        <button
-          @click="handleTabClick('data')"
-          @mouseenter="handleMouseEnter('data')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
-          ]"
-        >
+        <button @click="handleTabClick('data')" @mouseenter="handleMouseEnter('data')" :class="[
+          'rail-btn',
+          { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
+        ]">
           <span class="rail-icon icon-data"></span>
           <span class="rail-label">ข้อมูล</span>
         </button>
 
-        <button
-          @click="handleTabClick('layers')"
-          @mouseenter="handleMouseEnter('layers')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'layers' && isOpen, pinned: isPinned && activeTab === 'layers' }
-          ]"
-        >
-          <span class="rail-icon icon-layers"></span>
-          <span class="rail-label">เลเยอร์</span>
-        </button>
-
-        <button
-          @click="handleTabClick('assets')"
-          @mouseenter="handleMouseEnter('assets')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'assets' && isOpen, pinned: isPinned && activeTab === 'assets' }
-          ]"
-        >
+        <button @click="handleTabClick('assets')" @mouseenter="handleMouseEnter('assets')" :class="[
+          'rail-btn',
+          { active: activeTab === 'assets' && isOpen, pinned: isPinned && activeTab === 'assets' }
+        ]">
           <span class="rail-icon icon-image"></span>
           <span class="rail-label">รูปภาพ</span>
         </button>
 
-        <button
-          @click="handleTabClick('project')"
-          @mouseenter="handleMouseEnter('project')"
-          :class="[
-            'rail-btn',
-            {
-              active: activeTab === 'project' && isOpen,
-              pinned: isPinned && activeTab === 'project'
-            }
-          ]"
-        >
+        <button @click="handleTabClick('project')" @mouseenter="handleMouseEnter('project')" :class="[
+          'rail-btn',
+          {
+            active: activeTab === 'project' && isOpen,
+            pinned: isPinned && activeTab === 'project'
+          }
+        ]">
           <span class="rail-icon icon-project"></span>
           <span class="rail-label">โปรเจกต์</span>
         </button>
@@ -84,10 +42,7 @@
 
     <div class="sidebar-panel" :class="{ collapsed: !isOpen }">
       <div class="panel-header">
-        <div class="panel-header-title" v-if="activeTab === 'templates'">
-          <span class="panel-header-icon icon-dashboard-active"></span>
-          <h3 class="panel-header-text">จัดการเทมเพลต</h3>
-        </div>
+
 
         <div class="panel-header-title" v-if="activeTab === 'pages'">
           <span class="panel-header-icon icon-pages"></span>
@@ -99,10 +54,7 @@
           <h3 class="panel-header-text">จัดการข้อมูล</h3>
         </div>
 
-        <div class="panel-header-title" v-if="activeTab === 'layers'">
-          <span class="panel-header-icon icon-layers-header"></span>
-          <h3 class="panel-header-text">จัดการลำดับชั้นวัตถุ</h3>
-        </div>
+
 
         <div class="panel-header-title" v-if="activeTab === 'assets'">
           <span class="panel-header-icon icon-image-header"></span>
@@ -117,37 +69,23 @@
       <div class="panel-content">
         <div v-if="activeTab === 'pages'" class="tab-pane-pages">
           <div class="pages-list" @mouseleave="clearDragState">
-            <div
-              v-for="(page, index) in pages"
-              :key="page.id"
-              :class="[
-                'page-item-sidebar',
-                {
-                  active: isOpen && currentPageIndex === index,
-                  disabled: !isCanvasReady,
-                  dragging: draggedPageIndex === index,
-                  'drag-target-top': dragOverIndex === index && dragPosition === 'top',
-                  'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
-                }
-              ]"
-              draggable="true"
-              @dragstart="onPageDragStart($event, index)"
-              @dragover.prevent="onPageDragOver($event, index)"
-              @drop="onPageDrop($event, index)"
-              @dragend="onPageDragEnd"
-              @click="isCanvasReady ? $emit('page-click', index) : null"
-            >
+            <div v-for="(page, index) in pages" :key="page.id" :class="[
+              'page-item-sidebar',
+              {
+                active: isOpen && currentPageIndex === index,
+                disabled: !isCanvasReady,
+                dragging: draggedPageIndex === index,
+                'drag-target-top': dragOverIndex === index && dragPosition === 'top',
+                'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
+              }
+            ]" draggable="true" @dragstart="onPageDragStart($event, index)"
+              @dragover.prevent="onPageDragOver($event, index)" @drop="onPageDrop($event, index)"
+              @dragend="onPageDragEnd" @click="isCanvasReady ? $emit('page-click', index) : null">
               <div class="page-entry">
                 <div class="page-thumb">
-                  <img
-                    :src="page.background || getDefaultPageImage(index)"
-                    :alt="`Page ${index + 1}`"
-                  />
-                  <button
-                    class="del-page-btn"
-                    @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
-                    v-if="pages.length > 1"
-                  >
+                  <img :src="page.background || getDefaultPageImage(index)" :alt="`Page ${index + 1}`" />
+                  <button class="del-page-btn" @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
+                    v-if="pages.length > 1">
                     <span class="icon-delete"></span>
                   </button>
                 </div>
@@ -159,82 +97,11 @@
           </div>
         </div>
 
-        <div v-if="activeTab === 'templates'" class="tab-pane-templates">
-          <div class="history-section">
-            <div class="btn-history-header">ประวัติรายงาน</div>
-            <button
-              @click="$emit('open-history')"
-              :class="['btn-history', { active: isHistoryOpen }]"
-            >
-              <span class="btn-history-icon"></span>
-              <span class="btn-history-text">ประวัติการสร้างรายงาน</span>
-            </button>
-          </div>
-
-          <div class="template-save-pane">
-            <div class="save-pane-inner">
-              <div class="existing-templates-list">
-                <div
-                  v-if="templates.length === 0"
-                  class="hint"
-                  style="margin-top: 0; margin-bottom: 8px"
-                >
-                  ยังไม่มีเทมเพลตที่บันทึกไว้
-                </div>
-                <div class="template-list">
-                  <div v-for="t in templates" :key="t._id" class="template-item-row">
-                    <span
-                      @click="$emit('load-template', t)"
-                      :class="['t-name', { disabled: !isCanvasReady }]"
-                    >
-                      {{ sanitizeTemplateName(t.name) }}
-                    </span>
-                    <button
-                      @click="isCanvasReady ? $emit('delete-template', t._id) : null"
-                      class="btn-del"
-                      :disabled="!isCanvasReady"
-                    >
-                      <span class="icon-delete"></span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="template-label-small">ชื่อเทมเพลต / ชื่องาน:</div>
-
-              <input
-                :value="templateName"
-                @input="$emit('update:templateName', $event.target.value)"
-                placeholder="ตั้งชื่อเทมเพลต..."
-                :disabled="isPreviewMode"
-                class="template-name-input"
-              />
-
-              <button
-                @click="$emit('save-template')"
-                class="template-save-btn"
-                :disabled="isPreviewMode"
-              >
-                <span class="template-save-text">บันทึกเป็นแม่แบบ</span>
-              </button>
-            </div>
-          </div>
-
-          <button v-if="currentTemplateId" @click="$emit('reset-canvas')" class="btn-new">
-            + สร้างหน้ากระดาษใหม่
-          </button>
-        </div>
-
         <div v-if="activeTab === 'data'" class="tab-pane-data">
           <div class="data-section">
             <h4 class="label-small">ข้อความทั่วไป:</h4>
-            <button
-              @click="handleAddCustomText"
-              class="var-btn"
-              :disabled="isPreviewMode"
-              draggable="true"
-              @dragstart="onCustomTextDragStart($event)"
-            >
+            <button @click="handleAddCustomText" class="var-btn" :disabled="isPreviewMode" draggable="true"
+              @dragstart="onCustomTextDragStart($event)">
               <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
               <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
             </button>
@@ -243,16 +110,10 @@
           <div class="data-section" v-if="signatories.length > 0">
             <h4 class="label-small">บล็อกลายเซ็น:</h4>
             <div class="var-list">
-              <button
-                v-for="sig in signatories"
-                :key="sig.id"
-                draggable="true"
-                @dragstart="onSignatureDragStart($event, sig)"
-                @click="$emit('add-signature-block', sig)"
-                class="var-btn"
-                :disabled="isPreviewMode"
-                :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName"
-              >
+              <button v-for="sig in signatories" :key="sig.id" draggable="true"
+                @dragstart="onSignatureDragStart($event, sig)" @click="$emit('add-signature-block', sig)"
+                class="var-btn" :disabled="isPreviewMode"
+                :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName">
                 <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                 <span class="var-btn-text">
                   {{ sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName }}
@@ -268,15 +129,8 @@
             <div class="var-list">
               <div v-for="(group, category) in groupedVariables" :key="category" class="var-group">
                 <h5 class="category-header">{{ category }}</h5>
-                <button
-                  v-for="v in group"
-                  :key="v.key"
-                  @click="$emit('add-variable', v.key)"
-                  draggable="true"
-                  @dragstart="onDragStart($event, v.key)"
-                  class="var-btn"
-                  :disabled="isPreviewMode"
-                >
+                <button v-for="v in group" :key="v.key" @click="$emit('add-variable', v.key)" draggable="true"
+                  @dragstart="onDragStart($event, v.key)" class="var-btn" :disabled="isPreviewMode">
                   <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                   <span class="var-btn-text">{{ v.label }}</span>
                 </button>
@@ -285,70 +139,28 @@
           </div>
         </div>
 
-        <div
-          v-if="activeTab === 'layers'"
-          class="tab-pane-layers"
-          style="display: flex; flex-direction: column; align-items: center; padding-top: 15px"
-        >
-          <div class="layers-section" style="width: 298px">
-            <div class="layers-list">
-              <div
-                v-if="!layers || layers.length === 0"
-                class="hint"
-                style="text-align: center; margin-top: 10px"
-              >
-                ไม่มีวัตถุในหน้านี้
-              </div>
-
-              <button
-                v-for="layer in layers"
-                :key="layer.id"
-                :class="['layer-item-btn', { active: layer.isActive }]"
-                @click="$emit('select-layer', layer.rawObject)"
-              >
-                {{ layer.label }} (ชั้นที่ {{ layer.index }})
-              </button>
-            </div>
-          </div>
-        </div>
-
         <div v-if="activeTab === 'assets'" class="tab-pane">
-          <AssetManager
-            :is-preview-mode="isPreviewMode"
-            @select-asset="$emit('add-image', $event)"
-          />
+          <AssetManager :is-preview-mode="isPreviewMode" @select-asset="$emit('add-image', $event)" />
         </div>
 
         <div v-if="activeTab === 'project'" class="tab-pane-project">
           <div class="project-section">
             <h4 class="label">นำเข้าโปรเจกต์ / PDF / รูปภาพ</h4>
             <div class="upload-container">
-              <button
-                class="btn-upload-dashed"
-                @click.stop="$emit('import-workspace')"
-                :disabled="!isCanvasReady"
-              >
+              <button class="btn-upload-dashed" @click.stop="$emit('import-workspace')" :disabled="!isCanvasReady">
                 <span class="btn-upload-dashed-icon"></span>
                 <span class="btn-upload-dashed-text">นำเข้าโปรเจกต์</span>
               </button>
-              <button
-                class="btn-upload-dashed"
-                style="margin-top: 8px; border-color: #2196f3; background-image: none"
-                @click.stop="promptForUrl"
-                :disabled="!isCanvasReady"
-              >
+              <button class="btn-upload-dashed" style="margin-top: 8px; border-color: #2196f3; background-image: none"
+                @click.stop="promptForUrl" :disabled="!isCanvasReady">
                 <span class="btn-upload-dashed-text" style="color: #2196f3">นำเข้าจาก URL</span>
               </button>
             </div>
-            <p class="hint-text">รองรับไฟล์ : Json, Hybrid, PDF, รูปภาพ</p>
+            <p class="hint-text">รองรับไฟล์ : PDF</p>
           </div>
 
           <div class="project-section">
-            <button
-              @click="$emit('save-report')"
-              class="btn-project-save"
-              :disabled="isPreviewMode"
-            >
+            <button @click="$emit('save-report')" class="btn-project-save" :disabled="isPreviewMode">
               <span class="btn-project-save-text">บันทึกโปรเจกต์</span>
             </button>
             <p class="hint-text">บันทึกลงประวัติและไฟล์ Hybrid PDF</p>
@@ -356,10 +168,7 @@
           <div class="project-section">
             <h4 class="label">คุณภาพ PDF:</h4>
             <div class="radio-group-list">
-              <div
-                :class="['radio-card', { active: pdfQuality == '1' }]"
-                @click="$emit('update:pdfQuality', '1')"
-              >
+              <div :class="['radio-card', { active: pdfQuality == '1' }]" @click="$emit('update:pdfQuality', '1')">
                 <div class="radio-circle">
                   <div class="radio-inner" v-if="pdfQuality == '1'"></div>
                 </div>
@@ -369,10 +178,7 @@
                 </div>
                 <div class="radio-badge">1x</div>
               </div>
-              <div
-                :class="['radio-card', { active: pdfQuality == '2' }]"
-                @click="$emit('update:pdfQuality', '2')"
-              >
+              <div :class="['radio-card', { active: pdfQuality == '2' }]" @click="$emit('update:pdfQuality', '2')">
                 <div class="radio-circle">
                   <div class="radio-inner" v-if="pdfQuality == '2'"></div>
                 </div>
@@ -382,10 +188,7 @@
                 </div>
                 <div class="radio-badge">2x</div>
               </div>
-              <div
-                :class="['radio-card', { active: pdfQuality == '3' }]"
-                @click="$emit('update:pdfQuality', '3')"
-              >
+              <div :class="['radio-card', { active: pdfQuality == '3' }]" @click="$emit('update:pdfQuality', '3')">
                 <div class="radio-circle">
                   <div class="radio-inner" v-if="pdfQuality == '3'"></div>
                 </div>
@@ -395,10 +198,7 @@
                 </div>
                 <div class="radio-badge">3x</div>
               </div>
-              <div
-                :class="['radio-card', { active: pdfQuality == '4' }]"
-                @click="$emit('update:pdfQuality', '4')"
-              >
+              <div :class="['radio-card', { active: pdfQuality == '4' }]" @click="$emit('update:pdfQuality', '4')">
                 <div class="radio-circle">
                   <div class="radio-inner" v-if="pdfQuality == '4'"></div>
                 </div>
@@ -411,42 +211,10 @@
             </div>
           </div>
 
-          <div class="project-section">
-            <h4 class="label">รูปแบบการส่งออก (Engine):</h4>
-            <div class="radio-group-list">
-              <div
-                :class="['radio-card', { active: pdfMode == 'flatten' }]"
-                @click="$emit('update:pdfMode', 'flatten')"
-              >
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfMode == 'flatten'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">รูปภาพ</div>
-                  <div class="radio-subtitle">ถูกต้อง100%</div>
-                </div>
-              </div>
-              <div
-                :class="['radio-card', { active: pdfMode == 'vector' }]"
-                @click="$emit('update:pdfMode', 'vector')"
-              >
-                <div class="radio-circle">
-                  <div class="radio-inner" v-if="pdfMode == 'vector'"></div>
-                </div>
-                <div class="radio-text-content">
-                  <div class="radio-title">เวคเตอร์</div>
-                  <div class="radio-subtitle">แก้ไขข้อความใน Acrobat ได้</div>
-                </div>
-              </div>
-            </div>
-          </div>
+
 
           <div class="project-section" style="margin-top: 10px; margin-bottom: 30px">
-            <button
-              @click="$emit('generate-pdf')"
-              class="btn-print-outline"
-              :disabled="isGenerating || isPreviewMode"
-            >
+            <button @click="$emit('generate-pdf')" class="btn-print-outline" :disabled="isGenerating || isPreviewMode">
               <span class="btn-print-text">
                 {{ isGenerating ? 'กำลังสร้าง PDF...' : 'ส่งออกเป็นไฟล์ PDF' }}
               </span>
@@ -455,20 +223,9 @@
 
           <div class="danger-zone">
             <div class="danger-zone-title">พื้นที่อันตราย</div>
-            <button
-              @click="$emit('reset-project')"
-              class="btn-reset-project"
-              title="ล้างข้อมูลการแก้ไขทั้งหมด"
-            >
-              <svg
-                class="reset-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
+            <button @click="$emit('reset-project')" class="btn-reset-project" title="ล้างข้อมูลการแก้ไขทั้งหมด">
+              <svg class="reset-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                 <path d="M3 3v5h5"></path>
               </svg>
@@ -481,25 +238,12 @@
 
       <div class="panel-footer" v-if="activeTab === 'pages'">
         <div class="add-page-actions-sidebar">
-          <button
-            class="add-pg-btn"
-            @click="isCanvasReady ? $emit('add-page') : null"
-            :disabled="!isCanvasReady"
-          >
+          <button class="add-pg-btn" @click="isCanvasReady ? $emit('add-page') : null" :disabled="!isCanvasReady">
             + เพิ่มหน้าว่างใหม่
           </button>
-          <input
-            type="file"
-            ref="appendInput"
-            @change="onAppendFileChange"
-            accept="application/pdf, image/jpeg, image/png, image/gif, image/webp"
-            style="display: none"
-          />
-          <button
-            class="add-pg-btn secondary"
-            @click="triggerAppendUpload"
-            :disabled="!isCanvasReady"
-          >
+          <input type="file" ref="appendInput" @change="onAppendFileChange"
+            accept="application/pdf" style="display: none" />
+          <button class="add-pg-btn secondary" @click="triggerAppendUpload" :disabled="!isCanvasReady">
             + นำเข้าหน้าใหม่
           </button>
         </div>
@@ -512,10 +256,7 @@
 import { ref, onMounted } from 'vue';
 import apiService from '../services/apiService';
 
-const sanitizeTemplateName = (name) => {
-  if (!name) return 'Untitled Template';
-  return name.replace(/\.[^/.]+$/, '');
-};
+
 
 const signatories = ref([]);
 
@@ -532,7 +273,7 @@ const onWorkspaceFileChange = (e) => {
   emit('import-workspace', e);
 };
 
-const activeTab = ref('templates');
+const activeTab = ref('pages');
 const isPinned = ref(false);
 
 const promptForUrl = () => {
@@ -576,26 +317,15 @@ const props = defineProps({
   },
   isHistoryOpen: Boolean,
   connectionStatus: String,
-  templates: {
-    type: Array,
-    default: () => []
-  },
   isCanvasReady: Boolean,
-  templateName: String,
   isPreviewMode: Boolean,
-  currentTemplateId: String,
   isGenerating: Boolean,
   pdfQuality: [String, Number],
-  layers: {
-    type: Array,
-    default: () => []
-  },
   pages: {
     type: Array,
     default: () => []
   },
-  currentPageIndex: Number,
-  pdfMode: String
+  currentPageIndex: Number
 });
 
 const groupedVariables = ref({
@@ -607,11 +337,7 @@ const groupedVariables = ref({
 });
 
 const emit = defineEmits([
-  'load-template',
-  'delete-template',
-  'update:templateName',
   'update:pdfQuality',
-  'save-template',
   'reset-canvas',
   'toggle-preview',
   'import-workspace',
@@ -624,12 +350,10 @@ const emit = defineEmits([
   'toggle',
   'open',
   'close',
-  'select-layer',
   'import-url',
   'delete-page',
   'page-click',
   'page-drop',
-  'update:pdfMode',
   'unified-import'
 ]);
 

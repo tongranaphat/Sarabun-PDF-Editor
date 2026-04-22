@@ -27,26 +27,9 @@ const VariableSchema = z.object({
     value: z.string().optional()
 });
 
-const PageObjectSchema = z
-    .object({
-        type: z.string()
-    })
-    .passthrough();
-
-const TemplateSchema = z.object({
-    name: z.string().min(1).max(100),
-    background: z.string().nullable().optional(),
-    pages: z.array(z.any()).default([]),
-    userId: z.string().uuid().optional().nullable()
-});
-
-const UpdateTemplateSchema = TemplateSchema.partial();
-
 module.exports = {
     validate,
     Schemas: {
-        Variable: VariableSchema,
-        Template: TemplateSchema,
-        UpdateTemplate: UpdateTemplateSchema
+        Variable: VariableSchema
     }
 };

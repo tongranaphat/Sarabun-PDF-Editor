@@ -164,10 +164,9 @@ CREATE TABLE public."Variable" (
 --
 
 COPY public."Asset" (id, filename, mimetype, "createdAt", filepath, url) FROM stdin;
-c8a2f033-e53a-4da6-b2f9-a60172a13e3e	1774863860446-reference_crops_forcep1.png	image/png	2026-03-30 09:44:20.453	/uploads/assets/1774863860446-reference_crops_forcep1.png	http://localhost:4010/uploads/assets/1774863860446-reference_crops_forcep1.png
-88e71e83-31df-44c5-9f52-9a1f0568b787	1774928291327-reference_crops_plier.png	image/png	2026-03-31 03:38:11.331	/uploads/assets/1774928291327-reference_crops_plier.png	http://localhost:4010/uploads/assets/1774928291327-reference_crops_plier.png
-e9366bb1-9905-4a2b-a730-ca3c569fc7e9	1775640614831-signature.png	image/png	2026-04-08 09:30:14.835	/uploads/assets/1775640614831-signature.png	http://localhost:4010/uploads/assets/1775640614831-signature.png
-fa913a32-47f1-4930-bc9f-b9935e0cc7bf	1775642102995-âPngtreeâstar vector icon_4015244.png	image/png	2026-04-08 09:55:02.998	/uploads/assets/1775642102995-âPngtreeâstar vector icon_4015244.png	http://localhost:4010/uploads/assets/1775642102995-âPngtreeâstar vector icon_4015244.png
+c8a2f033-e53a-4da6-b2f9-a60172a13e3e	1774863860446-reference_crops_forcep1.png	image/png	2026-03-30 09:44:20.453	/uploads/assets/1774863860446-reference_crops_forcep1.png	http://localhost:4011/uploads/assets/1774863860446-reference_crops_forcep1.png
+88e71e83-31df-44c5-9f52-9a1f0568b787	1774928291327-reference_crops_plier.png	image/png	2026-03-31 03:38:11.331	/uploads/assets/1774928291327-reference_crops_plier.png	http://localhost:4011/uploads/assets/1774928291327-reference_crops_plier.png
+e9366bb1-9905-4a2b-a730-ca3c569fc7e9	1775640614831-signature.png	image/png	2026-04-08 09:30:14.835	/uploads/assets/1775640614831-signature.png	http://localhost:4011/uploads/assets/1775640614831-signature.png
 \.
 
 

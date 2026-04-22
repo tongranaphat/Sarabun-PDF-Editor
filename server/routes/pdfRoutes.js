@@ -15,7 +15,8 @@ const {
     saveGeneratedPdfState,
     prepareWorkspace,
     resetToOriginal,
-    cleanupTempFile
+    cleanupTempFile,
+    getStampMetadata
 } = require('../controllers/pdfController');
 
 const { asyncHandler } = require('../utils/errorHandler');
@@ -23,6 +24,7 @@ const { asyncHandler } = require('../utils/errorHandler');
 router.get('/pdf/workspace/:id', asyncHandler(prepareWorkspace));
 router.post('/pdf/reset/:id', asyncHandler(resetToOriginal));
 router.post('/pdf/save-state', upload.single('pdfFile'), asyncHandler(savePdfState));
+router.get('/pdf/stamp-metadata', asyncHandler(getStampMetadata));
 
 router.post('/generate-pdf', asyncHandler(generatePDF));
 router.post('/check-pdf-type', upload.single('image'), asyncHandler(checkPdfType));

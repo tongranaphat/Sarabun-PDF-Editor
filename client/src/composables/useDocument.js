@@ -10,29 +10,28 @@ import { apiService } from '../services/apiService';
 import { showNotification } from '../utils/notifications';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 
-export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
-  const { resetHistory, saveHistory, setHistoryLock } = canvasHelpers;
+export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
+  const { resetHistory, saveHistory, setHistoryLock, addStampBlockToCanvas } = canvasHelpers;
 
-  const _templateCallbacks = {
+  const _documentCallbacks = {
     saveCurrentPageState: null,
     renderAllPages: null
   };
 
-  const setTemplateCallbacks = (cbs = {}) => {
+  const setDocumentCallbacks = (cbs = {}) => {
     if (cbs.saveCurrentPageState)
-      _templateCallbacks.saveCurrentPageState = cbs.saveCurrentPageState;
-    if (cbs.renderAllPages) _templateCallbacks.renderAllPages = cbs.renderAllPages;
+      _documentCallbacks.saveCurrentPageState = cbs.saveCurrentPageState;
+    if (cbs.renderAllPages) _documentCallbacks.renderAllPages = cbs.renderAllPages;
   };
 
   const editorStore = useEditorStore();
   const {
     variables,
-    templates,
     pages,
     currentPageIndex,
-    currentTemplateId,
+    currentDocumentId,
     currentReportId,
-    templateName,
+    documentTitle,
     isPreviewMode,
     isSidebarOpen,
     groupedVariables
@@ -94,7 +93,7 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     }));
   };
 
-  const sanitizeTemplateName = (name) => {
+  const sanitizeDocumentTitle = (name) => {
     return (name || 'Untitled')
       .replace(/<[^>]*>/g, '')
       .trim()
@@ -192,18 +191,16 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
   };
 
   const fetchVariables = editorStore.fetchVariables;
-  const fetchTemplates = editorStore.fetchTemplates;
 
   const saveReport = async (isSilent = false) => {
     if (!canvas.value) return;
-    if (typeof _templateCallbacks.saveCurrentPageState === 'function')
-      _templateCallbacks.saveCurrentPageState();
+    if (typeof _documentCallbacks.saveCurrentPageState === 'function')
+      _documentCallbacks.saveCurrentPageState();
 
     const pagesData = preparePagesForSave();
     const payload = {
       id: currentReportId.value,
-      templateId: currentTemplateId.value,
-      name: templateName.value || 'Untitled Project',
+      name: documentTitle.value || 'Untitled Project',
       pages: pagesData,
       pageDimensions: pages.value.map((p) => ({ width: p.width, height: p.height })),
       status: 'DRAFT'
@@ -219,78 +216,13 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     }
   };
 
-  const saveTemplate = async (isSilent = false) => {
-    if (!canvas.value) return;
-    if (typeof _templateCallbacks.saveCurrentPageState === 'function')
-      _templateCallbacks.saveCurrentPageState();
-
-    const pagesData = preparePagesForSave();
-    const payload = {
-      name: templateName.value || 'Untitled Template',
-      pages: pagesData,
-      pageDimensions: pages.value.map((p) => ({ width: p.width, height: p.height })),
-      userId: getMachineId()
-    };
-
-    try {
-      if (currentTemplateId.value) {
-        await apiService.updateTemplate(currentTemplateId.value, payload);
-        if (!isSilent) {
-          showNotification('Template Updated successfully!', 'success');
-        }
-      } else {
-        const response = await apiService.saveTemplate(payload);
-        const templateId = response?.data?.id || response?.id || response;
-        currentTemplateId.value =
-          typeof templateId === 'string' ? templateId : String(templateId || '');
-        if (!isSilent) {
-          showNotification('Template Saved successfully!', 'success');
-        }
-      }
-    } catch (e) {
-      const errorMsg = 'Save Template failed: ' + (e.response?.data || e.message);
-      if (!isSilent) {
-        showNotification(errorMsg, 'error');
-      }
-      console.error(errorMsg, e);
-      throw e;
-    }
-  };
-
-  const loadTemplate = async (t) => {
-    if (!canvas.value) return;
-
-    currentTemplateId.value =
-      typeof (t._id || t.id) === 'string' ? t._id || t.id : String(t._id || t.id || '');
-    currentReportId.value = null;
-    templateName.value = t.name;
-    isPreviewMode.value = false;
-    originalObjectStates.value = {};
-
-    try {
-      if (t.pages && Array.isArray(t.pages) && t.pages.length > 0) {
-        pages.value = sanitizePagesData(JSON.parse(JSON.stringify(t.pages)));
-      } else {
-        pages.value = [{ id: 0, background: t.background || null, objects: t.objects || [] }];
-      }
-      currentPageIndex.value = 0;
-      if (resetHistory) resetHistory();
-
-      if (typeof _templateCallbacks.renderAllPages === 'function') {
-        _templateCallbacks.renderAllPages();
-      }
-    } catch (error) {
-      console.error('Error loading template:', error);
-    }
-  };
-
   const loadReportById = async (id) => {
     try {
       const r = await apiService.getReportById(id);
       if (r) {
         currentReportId.value = r.id;
-        currentTemplateId.value = r.templateId;
-        templateName.value = r.name;
+        currentDocumentId.value = null;
+        documentTitle.value = r.name;
         if (r.pages && Array.isArray(r.pages)) {
           pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
           currentPageIndex.value = 0;
@@ -319,22 +251,10 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
   };
 
   const addBlankPage = () => {
-    if (pages.value.length > 0 && typeof _templateCallbacks.saveCurrentPageState === 'function') {
-      _templateCallbacks.saveCurrentPageState();
+    if (pages.value.length > 0 && typeof _documentCallbacks.saveCurrentPageState === 'function') {
+      _documentCallbacks.saveCurrentPageState();
     }
     editorStore.addBlankPage();
-  };
-
-  const deleteTemplate = async (id) => {
-    if (!confirm('Delete this template?')) return;
-    try {
-      await apiService.deleteTemplate(id);
-      await fetchTemplates();
-      if (currentTemplateId.value === id) await resetCanvas();
-      showNotification('Template deleted successfully', 'success');
-    } catch (e) {
-      showNotification('Delete failed: ' + (e.response?.data || e.message), 'error');
-    }
   };
 
   const handleImportWorkspace = async (e) => {
@@ -361,17 +281,6 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
             console.error('Report not found on server');
           }
         }
-        if (!loaded) {
-          try {
-            const tData = await apiService.getTemplateById(metadata.id);
-            if (tData) {
-              await loadTemplate(tData);
-              loaded = true;
-            }
-          } catch (err) {
-            console.error('Template not found on server');
-          }
-        }
       }
 
       if (!loaded && metadata && metadata.embeddedLayout) {
@@ -379,7 +288,6 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
           pages.value = sanitizePagesData(metadata.embeddedLayout);
           currentPageIndex.value = 0;
           loaded = true;
-          alert('Original template not found. Loaded from PDF metadata (Editable).');
         } catch (err) {
           console.error('Failed to load embedded layout', err);
         }
@@ -406,14 +314,8 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
       } catch (err) {
         alert('Failed to process PDF');
       }
-    } else if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (f) => {
-        pages.value[0].background = f.target.result;
-        pages.value[0].originalBackgroundType = 'Picture';
-      };
-      reader.readAsDataURL(file);
-      await new Promise((r) => setTimeout(r, 100));
+    } else {
+      alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
     }
     if (resetHistory) resetHistory();
   };
@@ -423,8 +325,8 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     if (!file) return;
     e.target.value = '';
 
-    if (pages.value.length > 0 && typeof _templateCallbacks.saveCurrentPageState === 'function') {
-      _templateCallbacks.saveCurrentPageState();
+    if (pages.value.length > 0 && typeof _documentCallbacks.saveCurrentPageState === 'function') {
+      _documentCallbacks.saveCurrentPageState();
     }
 
     const insertIndex = currentPageIndex.value + 1;
@@ -440,20 +342,8 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
         objects: [],
         originalBackgroundType: 'PDF'
       }));
-    } else if (file.type.startsWith('image/')) {
-      await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (f) => {
-          newPages.push({
-            id: Date.now(),
-            background: f.target.result,
-            objects: [],
-            originalBackgroundType: 'Picture'
-          });
-          resolve();
-        };
-        reader.readAsDataURL(file);
-      });
+    } else {
+      alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
     }
 
     if (newPages.length > 0) {
@@ -537,7 +427,7 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
 
   const getFullProjectData = () => {
     return {
-      name: templateName.value || 'Untitled Project',
+      name: documentTitle.value || 'Untitled Project',
       pages: preparePagesForSave(),
       version: '1.0',
       timestamp: new Date().toISOString(),
@@ -545,73 +435,17 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     };
   };
 
-  const unifiedSave = async (generatePdfFn, variableMap = null, isSilent = false) => {
-    if (window.showSaveFilePicker && !currentFileHandle.value) {
-      try {
-        const options = {
-          suggestedName: `${sanitizeTemplateName(templateName.value)}.pdf`
-        };
-
-        currentFileHandle.value = await window.showSaveFilePicker(options);
-        if (currentFileHandle.value) {
-          await generatePdfFn(canvasImages, projectData, variableMap);
-          saveHistory();
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') return false;
-        console.error('File picker failed:', err);
-      }
-      return;
-    }
-
-    try {
-      const payload = {
-        name: templateName.value || 'Untitled Template',
-        pages: preparePagesForSave(),
-        userId: getMachineId()
-      };
-
-      if (currentTemplateId.value) {
-        await apiService.updateTemplate(currentTemplateId.value, payload);
-        if (!isSilent) {
-          showNotification('Template Updated successfully!', 'success');
-        }
-      } else {
-        const response = await apiService.saveTemplate(payload);
-        const templateId = response?.data?.id || response?.id || response;
-        currentTemplateId.value =
-          typeof templateId === 'string' ? templateId : String(templateId || '');
-        if (!isSilent) {
-          showNotification('Template Saved successfully!', 'success');
-        }
-      }
-    } catch (e) {
-      console.warn('Silent DB save failed:', e);
-    }
-  };
-
   const handleUnifiedImport = async () => {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.pdf,.json,.drt,.png,.jpg,.jpeg';
+      input.accept = '.pdf';
       input.onchange = async (evt) => {
         const file = evt.target.files[0];
         if (!file) return resolve(false);
         try {
           if (!isWorkspaceEmpty()) {
             if (!confirm('Replace current workspace?')) return resolve(false);
-          }
-
-          if (
-            file.type === 'application/json' ||
-            file.name.endsWith('.json') ||
-            file.name.endsWith('.drt')
-          ) {
-            const text = await file.text();
-            const data = JSON.parse(text);
-            await loadProjectData(data, file.name);
-            return resolve(true);
           }
 
           if (file.type === 'application/pdf') {
@@ -647,11 +481,38 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
               }
 
               currentPageIndex.value = 0;
-              templateName.value = file.name.replace(/\.pdf$/i, '');
+              documentTitle.value = file.name.replace(/\.pdf$/i, '');
 
               if (typeof window !== 'undefined' && window.history) {
                 window.history.pushState({}, '', `/pdf/${savedFileId}`);
               }
+
+              if (!workspaceData.editState) {
+                try {
+                  const stampMeta = await apiService.getStampMetadata(savedFileId);
+                  await nextTick();
+                  if (typeof _documentCallbacks.renderAllPages === 'function') {
+                    await _documentCallbacks.renderAllPages();
+                  }
+                  if (addStampBlockToCanvas) {
+                    addStampBlockToCanvas(stampMeta);
+                    setTimeout(async () => {
+                      try {
+                        const pagesData = preparePagesForSave();
+                        const formData = new FormData();
+                        formData.append('OriginalFileId', savedFileId);
+                        formData.append('editState', JSON.stringify(pagesData));
+                        await apiService.savePdfState(formData);
+                      } catch (err) {
+                        console.error('Failed to auto-save stamp block', err);
+                      }
+                    }, 500);
+                  }
+                } catch (e) {
+                  console.warn('Failed to add auto stamp', e);
+                }
+              }
+
             } catch (uploadError) {
               console.error('Upload failed:', uploadError);
 
@@ -672,24 +533,7 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
             return resolve(true);
           }
 
-          if (file.type.startsWith('image/')) {
-            await resetCanvas();
-            const reader = new FileReader();
-            reader.onload = (f) => {
-              pages.value = [
-                {
-                  id: Date.now(),
-                  background: f.target.result,
-                  objects: [],
-                  originalBackgroundType: 'Picture'
-                }
-              ];
-              currentPageIndex.value = 0;
-            };
-            reader.readAsDataURL(file);
-            return resolve(true);
-          }
-
+          alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
           resolve(false);
         } catch (err) {
           console.error('Import Failed:', err);
@@ -703,8 +547,8 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
 
   const loadProjectData = async (data, filename) => {
     await resetCanvas();
-    templateName.value = data.name || filename.replace(/\.(json|pdf|drt)$/i, '');
-    currentTemplateId.value = null;
+    documentTitle.value = data.name || filename.replace(/\.(json|pdf|drt)$/i, '');
+    currentDocumentId.value = null;
     currentReportId.value = null;
     isPreviewMode.value = false;
 
@@ -719,10 +563,10 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     if (window.showSaveFilePicker && !currentFileHandle.value) {
       try {
         const options = {
-          suggestedName: `${sanitizeTemplateName(templateName.value)}.pdf`,
+          suggestedName: `${sanitizeDocumentTitle(documentTitle.value)}.pdf`,
           types: [
             {
-              description: 'Hybrid PDF Project',
+              description: 'PDF Document',
               accept: { 'application/pdf': ['.pdf'] }
             }
           ]
@@ -740,11 +584,10 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
 
   return {
     variables,
-    templates,
     customVarName,
-    templateName,
+    documentTitle,
     currentBackground,
-    currentTemplateId,
+    currentDocumentId,
     currentReportId,
     isPreviewMode,
     originalObjectStates,
@@ -754,11 +597,7 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     groupedVariables,
 
     fetchVariables,
-    fetchTemplates,
-    saveTemplate,
     saveReport,
-    loadTemplate,
-    deleteTemplate,
     resetCanvas,
     togglePreview,
     handleImportWorkspace,
@@ -770,13 +609,11 @@ export function useTemplate(canvas, zoomLevel, canvasHelpers = {}) {
     cleanFabricObject,
     preparePagesForSave,
     sanitizePagesData,
-    currentFileHandle,
     isPagesSidebarOpen,
-    unifiedSave,
     handleUnifiedImport,
     ensureFileHandle,
     processPdfToImages,
     saveFileWithFallback,
-    setTemplateCallbacks
+    setDocumentCallbacks
   };
 }

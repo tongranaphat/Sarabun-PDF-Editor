@@ -1,29 +1,33 @@
 services:
   db:
     image: postgres:18-alpine
+    command: -p ${DB_PORT}
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: dbpass
-      POSTGRES_DB: Dynamic_Report_Creator_DB
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sarabun_pgdata:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d Dynamic_Report_Creator_DB" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}" ]
       interval: 3s
       timeout: 5s
       retries: 5
 
   server:
-    build: ./server
+    build:
+      context: ./server
+      args:
+        - SERVER_PORT=${SERVER_PORT}
     ports:
-      - "4010:4010"
-      - "5555:5555"
+      - "${SERVER_PORT}:${SERVER_PORT}"
+      - "${PRISMA_PORT}:${PRISMA_PORT}"
     environment:
-      - DATABASE_URL=postgresql://postgres:dbpass@db:5432/Dynamic_Report_Creator_DB?schema=public
-      - PORT=4010
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}?schema=public
+      - PORT=${SERVER_PORT}
       - CLIENT_URL=*
       - ALLOWED_ORIGINS=*
     depends_on:
@@ -31,11 +35,14 @@ services:
         condition: service_healthy
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        - VITE_API_PORT=${SERVER_PORT}
     ports:
-      - "5173:80"
+      - "${CLIENT_PORT}:80"
     depends_on:
       - server
 
 volumes:
-  pgdata:
+  sarabun_pgdata:

@@ -1,61 +1,20 @@
 <template>
   <div class="app-layout">
-    <TopNavbar
-      :zoom-level="zoomLevel"
-      :is-preview-mode="isPreviewMode"
-      :is-generating="isGenerating"
-      @go-home="goHome"
-      @undo="undo"
-      @redo="redo"
-      @zoom-in="zoomIn"
-      @zoom-out="zoomOut"
-      @toggle-preview="togglePreviewWrapper"
-    />
+    <TopNavbar :zoom-level="zoomLevel" :is-preview-mode="isPreviewMode" :is-generating="isGenerating" @go-home="goHome"
+      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @toggle-preview="togglePreviewWrapper" />
 
-    <Sidebar
-      :isOpen="isSidebarOpen"
-      :is-history-open="showHistoryModal"
-      :connectionStatus="connectionStatus"
-      :templates="templates"
-      :isCanvasReady="isCanvasReady"
-      :templateName="templateName"
-      :isPreviewMode="isPreviewMode"
-      :currentTemplateId="currentTemplateId"
-      :groupedVariables="groupedVariables"
-      :isGenerating="isGenerating"
-      :pdfQuality="pdfQuality"
-      :pdfMode="pdfMode"
-      @update:pdfMode="pdfMode = $event"
-      :pages="pages"
-      :currentPageIndex="currentPageIndex"
-      @toggle="toggleSidebar"
-      @open="isSidebarOpen = true"
-      @close="isSidebarOpen = false"
-      @load-template="loadTemplateWrapper"
-      @delete-template="deleteTemplate"
-      @update:templateName="templateName = $event"
-      @update:pdfQuality="pdfQuality = $event"
-      @save-template="handleSaveTemplate"
-      @reset-canvas="goHome"
-      @toggle-preview="togglePreviewWrapper"
-      @import-workspace="handleImportWorkspaceWrapper"
-      @add-variable="handleAddVariable"
-      @addImage="addImageToCanvasWrapper"
-      @save-report="handleSaveProject"
-      @generate-pdf="handleExport"
-      @open-history="openHistoryModal"
-      @delete-page="deletePage"
-      @add-page="addBlankPageWrapper"
-      @import-page="handleAppendPageWrapper"
-      @page-click="scrollToPage"
-      @page-drop="handlePageDrop"
-      :layers="layers"
-      @select-layer="handleSelectLayer"
-      @import-url="handleUrlImport"
-      @reset-project="handleReset"
-      @add-signature-block="handleAddSignatureBlock"
-      @add-custom-variable="addCustomVariable"
-    />
+    <Sidebar :isOpen="isSidebarOpen" :is-history-open="showHistoryModal" :connectionStatus="connectionStatus"
+      :isCanvasReady="isCanvasReady" :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables"
+      :isGenerating="isGenerating" :pdfQuality="pdfQuality"
+      :pages="pages" :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
+      @close="isSidebarOpen = false" @update:pdfQuality="pdfQuality = $event" @reset-canvas="goHome"
+      @toggle-preview="togglePreviewWrapper" @import-workspace="handleImportWorkspaceWrapper"
+      @add-variable="handleAddVariable" @addImage="addImageToCanvasWrapper" @save-report="handleSaveProject"
+      @generate-pdf="handleExport" @open-history="openHistoryModal" @delete-page="deletePage"
+      @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
+      @page-drop="handlePageDrop" @import-url="handleUrlImport"
+      @reset-project="handleReset" @add-signature-block="handleAddSignatureBlock"
+      @add-custom-variable="addCustomVariable" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
       <div class="scroll-center-helper">
@@ -73,27 +32,16 @@
       <PropertiesPanel :canvas="canvas" :is-preview-mode="isPreviewMode" />
     </div>
 
-    <HistoryModal
-      v-if="showHistoryModal"
-      :reportInstances="reportHistory"
-      :currentInstanceId="currentReportId"
-      @close="showHistoryModal = false"
-      @edit="openReportFromHistory"
-      @delete="handleDeleteReport"
-    />
+    <HistoryModal v-if="showHistoryModal" :reportInstances="reportHistory" :currentInstanceId="currentReportId"
+      @close="showHistoryModal = false" @edit="openReportFromHistory" @delete="handleDeleteReport" />
 
-    <ExportOverlay
-      :visible="exportOverlay.visible"
-      :title="exportOverlay.title"
-      :current="exportOverlay.current"
-      :total="exportOverlay.total"
-      :stage="exportOverlay.stage"
-    />
+    <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
+      :total="exportOverlay.total" :stage="exportOverlay.stage" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch, nextTick, onUnmounted, computed, toRaw } from 'vue';
+import { onMounted, ref, watch, nextTick, onUnmounted, computed } from 'vue';
 import { fabric } from 'fabric';
 import TopNavbar from '../components/TopNavbar.vue';
 import PropertiesPanel from '../components/PropertiesPanel.vue';
@@ -102,7 +50,7 @@ import HistoryModal from '../components/HistoryModal.vue';
 import ExportOverlay from '../components/ExportOverlay.vue';
 
 import { useCanvas } from '../composables/useCanvas';
-import { useTemplate } from '../composables/useTemplate';
+import { useDocument } from '../composables/useDocument';
 import { useCanvasEvents } from '../composables/useCanvasEvents';
 
 import { useEditablePdf } from '../composables/useEditablePdf';
@@ -112,7 +60,7 @@ import { CANVAS_CONSTANTS } from '../constants/canvas';
 import { showNotification } from '../utils/notifications';
 import { yieldToMain } from '../utils/yieldToMain';
 import apiService from '../services/apiService';
-import { useLayers } from '../composables/useLayers';
+
 
 const currentPdfId = computed(() => {
   const parts = window.location.pathname.split('/');
@@ -131,7 +79,7 @@ const canvasBaseDimensions = ref({
 const connectionStatus = ref('offline');
 const isGenerating = ref(false);
 const pdfQuality = ref(2);
-const pdfMode = ref('flatten');
+const pdfMode = 'flatten';
 const pdfUrl = ref(null);
 let isRendering = false;
 
@@ -172,7 +120,7 @@ const triggerTempCleanup = () => {
     if (navigator.sendBeacon) {
       navigator.sendBeacon(cleanupUrl);
     } else {
-      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => {});
+      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => { });
     }
 
     activePdfId = null;
@@ -199,8 +147,8 @@ const openReportFromHistory = async (instance) => {
 
     if (r) {
       currentReportId.value = r.id;
-      currentTemplateId.value = r.templateId;
-      templateName.value = r.name;
+      currentDocumentId.value = null;
+      documentTitle.value = r.name;
 
       if (r.pages && Array.isArray(r.pages)) {
         pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
@@ -269,7 +217,7 @@ const handleUrlImport = async (url) => {
     }
 
     currentPageIndex.value = 0;
-    templateName.value =
+    documentTitle.value =
       url
         .split('/')
         .pop()
@@ -279,6 +227,29 @@ const handleUrlImport = async (url) => {
 
     await nextTick();
     await renderAllPages();
+
+    if (!workspaceData.editState) {
+      try {
+        const stampMeta = await apiService.getStampMetadata(newPdfId);
+        if (addStampBlockToCanvas) {
+          addStampBlockToCanvas(stampMeta);
+          setTimeout(async () => {
+            try {
+              const pagesData = preparePagesForSave();
+              const formData = new FormData();
+              formData.append('OriginalFileId', newPdfId);
+              formData.append('editState', JSON.stringify(pagesData));
+              await apiService.savePdfState(formData);
+            } catch (err) {
+              console.error('Failed to auto-save stamp block', err);
+            }
+          }, 500);
+        }
+      } catch (e) {
+        console.warn('Failed to add auto stamp', e);
+      }
+    }
+
     showNotification('นำเข้าไฟล์สำเร็จ!', 'success');
   } catch (error) {
     console.error('URL Import Error:', error);
@@ -307,6 +278,7 @@ const {
   addImageToCanvas,
   addVariableToCanvas,
   addSignatureBlockToCanvas,
+  addStampBlockToCanvas,
   setHistoryContext,
   isRemoteUpdating,
   updateCanvasDimensions,
@@ -315,57 +287,15 @@ const {
   dispose: disposeCanvas
 } = useCanvas();
 
-const canvasHelpers = { resetHistory, saveHistory, setHistoryLock };
+const canvasHelpers = { resetHistory, saveHistory, setHistoryLock, addStampBlockToCanvas };
 
-const { layers, updateLayers } = useLayers();
 
-const handleSelectLayer = (rawObj) => {
-  if (!canvas.value) return;
-
-  const rawCanvas = toRaw(canvas.value);
-  const currentActive = rawCanvas.getActiveObject();
-
-  if (currentActive && currentActive.isEditing) {
-    currentActive.exitEditing();
-  }
-
-  const obj = toRaw(rawObj);
-
-  if (obj) {
-    if (toRaw(currentActive) === obj) return;
-
-    rawCanvas.discardActiveObject();
-    rawCanvas.setActiveObject(obj);
-    rawCanvas.requestRenderAll();
-    rawCanvas.fire('selection:created', { selected: [obj] });
-
-    updateLayers(rawCanvas);
-  }
-};
-
-watch(
-  canvas,
-  (newCanvas) => {
-    if (newCanvas) {
-      const updateLayersCb = () => updateLayers(newCanvas);
-      newCanvas.on('object:added', updateLayersCb);
-      newCanvas.on('object:removed', updateLayersCb);
-      newCanvas.on('object:modified', updateLayersCb);
-      newCanvas.on('selection:created', updateLayersCb);
-      newCanvas.on('selection:cleared', updateLayersCb);
-      newCanvas.on('selection:updated', updateLayersCb);
-    }
-  },
-  { immediate: true }
-);
 
 const {
   variables,
-  templates,
-  templateName,
-  currentTemplateId,
+  documentTitle,
+  currentDocumentId,
   currentReportId,
-  currentFileHandle,
   isPreviewMode,
   pages,
   currentPageIndex,
@@ -373,11 +303,7 @@ const {
   isPagesSidebarOpen,
   groupedVariables,
   fetchVariables,
-  fetchTemplates,
-  saveTemplate,
   saveReport,
-  loadTemplate,
-  deleteTemplate,
   resetCanvas,
   togglePreview,
   handleImportWorkspace,
@@ -388,18 +314,16 @@ const {
   cleanFabricObject,
   preparePagesForSave,
   sanitizePagesData,
-
-  unifiedSave,
   handleUnifiedImport,
   ensureFileHandle,
   processPdfToImages,
   saveFileWithFallback,
-  setTemplateCallbacks
-} = useTemplate(canvas, zoomLevel, canvasHelpers);
+  setDocumentCallbacks
+} = useDocument(canvas, zoomLevel, canvasHelpers);
 
 if (setHistoryContext) setHistoryContext(pages, currentPageIndex);
 
-const originalTemplateBackup = ref(null);
+const originalTextBackup = ref(null);
 
 const { initCanvasEvents } = useCanvasEvents(
   canvas,
@@ -424,15 +348,7 @@ watch(zoomLevel, (newZoom) => {
   }
 });
 
-const handleSaveTemplate = async () => {
-  try {
-    await saveTemplate(false);
-    await editorStore.fetchTemplates();
-    saveHistory();
-  } catch (e) {
-    console.error('Save Template failed:', e);
-  }
-};
+
 
 const handleReset = async () => {
   const fileIdToReset = window.location.pathname.split('/').pop();
@@ -510,7 +426,7 @@ const handleSaveProject = async () => {
 
     const pagesData = preparePagesForSave();
     const projectData = {
-      name: templateName.value || 'โปรเจกต์ไม่มีชื่อ',
+      name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ',
       pages: pagesData,
       version: '1.0',
       timestamp: new Date().toISOString(),
@@ -668,11 +584,11 @@ const handleSaveProject = async () => {
 
         try {
           const historyPayload = {
-            name: templateName.value || 'โปรเจกต์ที่บันทึกแล้ว',
+            name: documentTitle.value || 'โปรเจกต์ที่บันทึกแล้ว',
             pages: pages.value,
             data: JSON.stringify(pages.value),
             pdfUrl: savedData.filepath || null,
-            templateId: currentTemplateId.value || null
+            documentId: currentDocumentId.value || null
           };
           await apiService.createReport(historyPayload);
 
@@ -718,7 +634,7 @@ const handleExport = async () => {
     saveCurrentPageState();
     const pagesData = preparePagesForSave();
     const projectData = {
-      name: templateName.value || 'โปรเจกต์ไม่มีชื่อ',
+      name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ',
       pages: pagesData,
       version: '1.0',
       timestamp: new Date().toISOString(),
@@ -877,7 +793,7 @@ const handleExport = async () => {
       updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไฟล์...');
       await yieldToMain();
 
-      const defaultFileName = `${templateName.value || 'report'}.pdf`;
+      const defaultFileName = `${documentTitle.value || 'report'}.pdf`;
       const saveResult = await saveFileWithFallback(pdfBlob, defaultFileName);
 
       if (!saveResult.success) {
@@ -893,14 +809,14 @@ const handleExport = async () => {
       }
 
       try {
-        const finalName = templateName.value || 'Untitled Report';
+        const finalName = documentTitle.value || 'Untitled Report';
 
         const historyPayload = {
           name: finalName,
           pages: pages.value,
           data: JSON.stringify(pages.value),
           pdfUrl: newHandle ? newHandle.name : defaultFileName,
-          templateId: currentTemplateId.value || null
+          documentId: currentDocumentId.value || null
         };
 
         const result = await apiService.createReport(historyPayload);
@@ -945,12 +861,7 @@ const handleExport = async () => {
   }
 };
 
-const loadTemplateWrapper = async (t) => {
-  await loadTemplate(t);
-  await nextTick();
-  await renderAllPages();
-  saveHistory();
-};
+
 
 const resetCanvasWrapper = async () => {
   await resetCanvas();
@@ -1062,7 +973,7 @@ const renderAllPages = async () => {
 
     canvas.value.discardActiveObject();
     canvas.value.clear();
-    canvas.value.setBackgroundColor(null, () => {});
+    canvas.value.setBackgroundColor(null, () => { });
 
     const actualZoom = zoomLevel.value || 1;
 
@@ -1204,7 +1115,6 @@ const renderAllPages = async () => {
   } finally {
     isRendering = false;
     setHistoryLock(false);
-    updateLayers(canvas.value);
   }
 };
 
@@ -1442,7 +1352,7 @@ const togglePreviewWrapper = async () => {
         .getObjects()
         .filter((obj) => ['textbox', 'text', 'i-text'].includes(obj.type) && obj.text);
 
-      originalTemplateBackup.value = textObjects.map((obj) => ({
+      originalTextBackup.value = textObjects.map((obj) => ({
         id: obj.id || `${obj.type}_${obj.left}_${obj.top}`,
         text: obj.text,
         editable: obj.editable,
@@ -1469,12 +1379,12 @@ const togglePreviewWrapper = async () => {
       togglePreview();
       await nextTick();
 
-      if (canvas.value && originalTemplateBackup.value) {
+      if (canvas.value && originalTextBackup.value) {
         canvas.value.selection = true;
         canvas.value.getObjects().forEach((obj) => {
           if (['textbox', 'text', 'i-text'].includes(obj.type)) {
             const objId = obj.id || `${obj.type}_${obj.left}_${obj.top}`;
-            const backup = originalTemplateBackup.value.find((t) => t.id === objId);
+            const backup = originalTextBackup.value.find((t) => t.id === objId);
 
             if (backup) {
               try {
@@ -1487,12 +1397,12 @@ const togglePreviewWrapper = async () => {
                   obj.set('textBaseline', 'alphabetic');
                 }
               } catch (e) {
-                console.warn('Failed to restore template:', e);
+                console.warn('Failed to restore text:', e);
               }
             }
           }
         });
-        originalTemplateBackup.value = null;
+        originalTextBackup.value = null;
       }
 
       if (canvas.value) canvas.value.selection = true;
@@ -1501,10 +1411,10 @@ const togglePreviewWrapper = async () => {
   } catch (error) {
     console.error('Preview toggle failed:', error);
     try {
-      if (!wasPreview && originalTemplateBackup.value) {
+      if (!wasPreview && originalTextBackup.value) {
         togglePreview();
         isPreviewMode.value = false;
-        originalTemplateBackup.value = null;
+        originalTextBackup.value = null;
       } else {
         isPreviewMode.value = true;
       }
@@ -1791,18 +1701,8 @@ const handleRouteChange = async () => {
     return;
   }
 
-  const templateMatch = currentPath.match(/^\/template\/([a-zA-Z0-9-]+)/i);
-  if (templateMatch && templateMatch[1]) {
-    const templateId = templateMatch[1];
-    try {
-      const templateData = await apiService.getTemplateById(templateId);
 
-      await loadTemplateWrapper(templateData);
-    } catch (error) {
-      console.error('Failed to load template from URL:', error);
-    }
-    return;
-  }
+
 
   const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-]+)/i);
   if (historyMatch && historyMatch[1]) {
@@ -1811,8 +1711,8 @@ const handleRouteChange = async () => {
       const r = await apiService.getReportById(instanceId);
       if (r) {
         currentReportId.value = r.id;
-        currentTemplateId.value = r.templateId;
-        templateName.value = r.name;
+        currentDocumentId.value = null;
+        documentTitle.value = r.name;
         if (r.pages && Array.isArray(r.pages)) {
           pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
           currentPageIndex.value = 0;
@@ -1839,8 +1739,7 @@ const handleRouteChange = async () => {
       }
 
       if (typeof editorStore !== 'undefined') {
-        if (typeof editorStore.setActiveTemplate === 'function')
-          editorStore.setActiveTemplate(null);
+
       }
     } catch (error) {
       console.error('Error resetting workspace on back navigation:', error);
@@ -1877,7 +1776,6 @@ onMounted(async () => {
 
   try {
     await fetchVariables();
-    await fetchTemplates();
   } catch (error) {
     console.error('Failed to initialize store data:', error);
   }
@@ -1885,15 +1783,7 @@ onMounted(async () => {
   await handleRouteChange();
   window.addEventListener('popstate', handleRouteChange);
 
-  if (canvas.value) {
-    const updateLayersCb = () => updateLayers(canvas.value);
-    canvas.value.on('object:added', updateLayersCb);
-    canvas.value.on('object:removed', updateLayersCb);
-    canvas.value.on('object:modified', updateLayersCb);
-    canvas.value.on('selection:created', updateLayersCb);
-    canvas.value.on('selection:updated', updateLayersCb);
-    canvas.value.on('selection:cleared', updateLayersCb);
-  }
+
 
   if (canvas.value) {
     canvas.value.on('history:restored', syncPagesFromCanvas);
@@ -1903,7 +1793,7 @@ onMounted(async () => {
     saveCurrentPageState,
     forceUnlockObject
   });
-  setTemplateCallbacks({
+  setDocumentCallbacks({
     saveCurrentPageState,
     renderAllPages
   });
@@ -2082,7 +1972,7 @@ onUnmounted(() => {
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.floating-panel-anchor > * {
+.floating-panel-anchor>* {
   pointer-events: auto;
 }
 

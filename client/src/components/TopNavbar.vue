@@ -62,8 +62,7 @@
           </div>
           <div class="export-dropdown-menu" v-if="showDropdown">
             <div class="dropdown-header">คุณภาพ PDF</div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '1' }]"
-              @click="selectQuality('1')">
+            <div :class="['dropdown-quality-item', { active: pdfQuality == '1' }]" @click="selectQuality('1')">
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '1'"></div>
               </div>
@@ -73,8 +72,7 @@
               </div>
               <span class="quality-badge">1x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '2' }]"
-              @click="selectQuality('2')">
+            <div :class="['dropdown-quality-item', { active: pdfQuality == '2' }]" @click="selectQuality('2')">
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '2'"></div>
               </div>
@@ -84,8 +82,7 @@
               </div>
               <span class="quality-badge">2x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '3' }]"
-              @click="selectQuality('3')">
+            <div :class="['dropdown-quality-item', { active: pdfQuality == '3' }]" @click="selectQuality('3')">
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '3'"></div>
               </div>
@@ -95,8 +92,7 @@
               </div>
               <span class="quality-badge">3x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '4' }]"
-              @click="selectQuality('4')">
+            <div :class="['dropdown-quality-item', { active: pdfQuality == '4' }]" @click="selectQuality('4')">
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '4'"></div>
               </div>
@@ -120,10 +116,6 @@ const props = defineProps({
   zoomLevel: {
     type: Number,
     required: true
-  },
-  isPreviewMode: {
-    type: Boolean,
-    default: false
   },
   isGenerating: {
     type: Boolean,
@@ -513,6 +505,7 @@ onUnmounted(() => {
     opacity: 0;
     transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

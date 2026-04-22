@@ -32,7 +32,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     currentDocumentId,
     currentReportId,
     documentTitle,
-    isPreviewMode,
     isSidebarOpen,
     groupedVariables
   } = storeToRefs(editorStore);
@@ -241,13 +240,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     canvas.value.clear();
     canvas.value.setBackgroundColor(null, null);
     if (resetHistory) resetHistory();
-  };
-
-  const togglePreview = (forceMode) => {
-    isPreviewMode.value = forceMode !== undefined ? forceMode : !isPreviewMode.value;
-    if (!canvas.value) return;
-    canvas.value.discardActiveObject();
-    canvas.value.requestRenderAll();
   };
 
   const addBlankPage = () => {
@@ -550,8 +542,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     documentTitle.value = data.name || filename.replace(/\.(json|pdf|drt)$/i, '');
     currentDocumentId.value = null;
     currentReportId.value = null;
-    isPreviewMode.value = false;
-
     if (data.pages) {
       pages.value = sanitizePagesData(data.pages);
     }
@@ -589,7 +579,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     currentBackground,
     currentDocumentId,
     currentReportId,
-    isPreviewMode,
     originalObjectStates,
     pages,
     currentPageIndex,
@@ -599,7 +588,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     fetchVariables,
     saveReport,
     resetCanvas,
-    togglePreview,
     handleImportWorkspace,
     handleImportAppend,
     addBlankPage,

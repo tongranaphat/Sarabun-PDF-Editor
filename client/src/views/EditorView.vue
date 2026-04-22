@@ -1,17 +1,16 @@
 <template>
   <div class="app-layout">
-    <TopNavbar :zoom-level="zoomLevel" :is-preview-mode="isPreviewMode" :is-generating="isGenerating"
-      :pdf-quality="pdfQuality" @go-home="goHome" @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut"
-      @save-report="handleSaveProject" @generate-pdf="handleExport" @reset-project="handleReset"
-      @update:pdfQuality="pdfQuality = $event" />
+    <TopNavbar :zoom-level="zoomLevel" :is-generating="isGenerating" :pdf-quality="pdfQuality" @go-home="goHome"
+      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @save-report="handleSaveProject"
+      @generate-pdf="handleExport" @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
 
     <Sidebar :isOpen="isSidebarOpen" :connectionStatus="connectionStatus" :isCanvasReady="isCanvasReady"
-      :isPreviewMode="isPreviewMode" :groupedVariables="groupedVariables" :pages="pages"
-      :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
-      @close="isSidebarOpen = false" @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper"
-      @add-variable="handleAddVariable" @delete-page="deletePage" @add-page="addBlankPageWrapper"
-      @import-page="handleAppendPageWrapper" @page-click="scrollToPage" @page-drop="handlePageDrop"
-      @add-signature-block="handleAddSignatureBlock" @add-custom-variable="addCustomVariable" />
+      :groupedVariables="groupedVariables" :pages="pages" :currentPageIndex="currentPageIndex" @toggle="toggleSidebar"
+      @open="isSidebarOpen = true" @close="isSidebarOpen = false" @reset-canvas="goHome"
+      @import-workspace="handleImportWorkspaceWrapper" @add-variable="handleAddVariable" @delete-page="deletePage"
+      @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
+      @page-drop="handlePageDrop" @add-signature-block="handleAddSignatureBlock"
+      @add-custom-variable="addCustomVariable" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
       <div class="scroll-center-helper">
@@ -26,7 +25,7 @@
     </main>
 
     <div v-if="canvas" class="floating-panel-anchor" :class="{ 'sidebar-closed': !isSidebarOpen }">
-      <PropertiesPanel :canvas="canvas" :is-preview-mode="isPreviewMode" />
+      <PropertiesPanel :canvas="canvas" />
     </div>
 
     <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
@@ -47,7 +46,6 @@ import { useDocument } from '../composables/useDocument';
 import { useCanvasEvents } from '../composables/useCanvasEvents';
 
 import { useEditablePdf } from '../composables/useEditablePdf';
-import { usePreviewData } from '../composables/usePreviewData';
 import { useEditorStore } from '../stores/editorStore';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 import { showNotification } from '../utils/notifications';
@@ -125,34 +123,6 @@ const fetchReports = async () => {
     reportHistory.value = await apiService.getReports();
   } catch (e) {
     console.error('Failed to fetch reports', e);
-  }
-};
-
-const openReportFromHistory = async (instance) => {
-  if (!confirm('การดำเนินการนี้จะแทนที่โปรเจกต์ปัจจุบัน คุณต้องการดำเนินการต่อหรือไม่?')) return;
-  try {
-    const r = await apiService.getReportById(instance.id);
-
-    if (r) {
-      currentReportId.value = r.id;
-      currentDocumentId.value = null;
-      documentTitle.value = r.name;
-
-      if (r.pages && Array.isArray(r.pages)) {
-        pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
-        currentPageIndex.value = 0;
-      }
-
-      if (resetHistory) resetHistory();
-      await nextTick();
-      await renderAllPages();
-
-      if (typeof window !== 'undefined' && window.history) {
-        window.history.pushState({}, '', `/history/${r.id}`);
-      }
-    }
-  } catch (e) {
-    alert('โหลดรายงานล้มเหลว: ' + e.message);
   }
 };
 
@@ -282,7 +252,6 @@ const {
   documentTitle,
   currentDocumentId,
   currentReportId,
-  isPreviewMode,
   pages,
   currentPageIndex,
   isSidebarOpen,
@@ -291,7 +260,6 @@ const {
   fetchVariables,
   saveReport,
   resetCanvas,
-  togglePreview,
   handleImportWorkspace,
   handleImportAppend,
   addBlankPage,
@@ -320,7 +288,6 @@ const { initCanvasEvents } = useCanvasEvents(
 );
 const { generateHybridPdfBlob, captureCanvasPageSafe } = useEditablePdf();
 
-const { getMockData } = usePreviewData();
 const editorStore = useEditorStore();
 
 watch(zoomLevel, (newZoom) => {
@@ -442,16 +409,12 @@ const handleSaveProject = async () => {
     const TEXT_TYPES = ['textbox', 'text', 'i-text'];
     const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
 
-    const wasPreview = isPreviewMode.value;
     const originalPage = currentPageIndex.value;
 
     try {
       canvas.value.requestRenderAll();
-      if (!wasPreview) saveCurrentPageState();
-      isPreviewMode.value = true;
       await renderAllPages();
       await nextTick();
-      applyPreviewDataToCanvas(variableMap);
       await nextTick();
 
       for (let i = 0; i < pages.value.length; i++) {
@@ -597,13 +560,7 @@ const handleSaveProject = async () => {
         canvas.value.renderAll();
       }
 
-      if (!wasPreview) {
-        isPreviewMode.value = false;
-        await nextTick();
-        loadPageToCanvas(originalPage);
-      } else {
-        loadPageToCanvas(originalPage);
-      }
+      loadPageToCanvas(originalPage);
     }
   } catch (e) {
     console.error('Save Project failed:', e);
@@ -655,18 +612,13 @@ const handleExport = async () => {
     const TEXT_TYPES = ['textbox', 'text', 'i-text'];
     const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
 
-    const wasPreview = isPreviewMode.value;
     const originalPage = currentPageIndex.value;
 
     try {
       showExportOverlay('กำลังส่งออก PDF...', pages.value.length + 2);
       updateExportProgress(0, 'กำลังเตรียมข้อมูล...');
       canvas.value.requestRenderAll();
-      if (!wasPreview) saveCurrentPageState();
-      isPreviewMode.value = true;
       await renderAllPages();
-      await nextTick();
-      applyPreviewDataToCanvas(variableMap);
       await nextTick();
 
       for (let i = 0; i < pages.value.length; i++) {
@@ -831,13 +783,7 @@ const handleExport = async () => {
         canvas.value.renderAll();
       }
 
-      if (!wasPreview) {
-        isPreviewMode.value = false;
-        await nextTick();
-        loadPageToCanvas(originalPage);
-      } else {
-        loadPageToCanvas(originalPage);
-      }
+      loadPageToCanvas(originalPage);
     }
   } catch (e) {
     console.error('Export failed:', e);
@@ -1202,7 +1148,6 @@ window.addCustomTextToCanvas = addCustomTextToCanvas;
 let isSavingState = false;
 
 const saveCurrentPageState = () => {
-  if (isPreviewMode.value || !canvas.value || isSavingState) return;
 
   isSavingState = true;
   try {
@@ -1294,117 +1239,6 @@ const setCanvasBackground = async (dataUrl) => {
   await renderAllPages();
 };
 
-const applyPreviewDataToCanvas = (customData = null) => {
-  if (!canvas.value) return;
-  const dataToUse = customData || getMockData();
-
-  canvas.value.selection = false;
-  canvas.value.discardActiveObject();
-
-  canvas.value.getObjects().forEach((obj) => {
-    if (['textbox', 'text', 'i-text'].includes(obj.type) && obj.text) {
-      let newText = obj.text;
-
-      Object.keys(dataToUse).forEach((key) => {
-        newText = newText.replace(new RegExp(`{{${key}}}`, 'g'), dataToUse[key] || '');
-      });
-
-      if (newText !== obj.text) obj.set('text', newText);
-
-      obj.set('splitByGrapheme', true);
-      obj.set('editable', false);
-    }
-
-    if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-      obj.set({ selectable: false, evented: false, hasControls: false, hasBorders: false });
-    }
-  });
-
-  canvas.value.requestRenderAll();
-};
-
-const togglePreviewWrapper = async () => {
-  saveCurrentPageState();
-  const wasPreview = isPreviewMode.value;
-
-  try {
-    if (!wasPreview) {
-      const textObjects = canvas.value
-        .getObjects()
-        .filter((obj) => ['textbox', 'text', 'i-text'].includes(obj.type) && obj.text);
-
-      originalTextBackup.value = textObjects.map((obj) => ({
-        id: obj.id || `${obj.type}_${obj.left}_${obj.top}`,
-        text: obj.text,
-        editable: obj.editable,
-        selectable: obj.selectable,
-        evented: obj.evented
-      }));
-
-      const previewVariableMap = {};
-      try {
-        const realData = await apiService.getVariables();
-        if (Array.isArray(realData)) {
-          realData.forEach((item) => {
-            if (item.key) previewVariableMap[item.key] = item.value || '';
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to fetch preview data from DB:', error);
-      }
-
-      togglePreview();
-      await nextTick();
-      applyPreviewDataToCanvas(previewVariableMap);
-    } else {
-      togglePreview();
-      await nextTick();
-
-      if (canvas.value && originalTextBackup.value) {
-        canvas.value.selection = true;
-        canvas.value.getObjects().forEach((obj) => {
-          if (['textbox', 'text', 'i-text'].includes(obj.type)) {
-            const objId = obj.id || `${obj.type}_${obj.left}_${obj.top}`;
-            const backup = originalTextBackup.value.find((t) => t.id === objId);
-
-            if (backup) {
-              try {
-                obj.set('text', backup.text);
-                obj.set('editable', backup.editable);
-                obj.set('selectable', backup.selectable);
-                obj.set('evented', backup.evented);
-
-                if (obj.textBaseline === 'alphabetical') {
-                  obj.set('textBaseline', 'alphabetic');
-                }
-              } catch (e) {
-                console.warn('Failed to restore text:', e);
-              }
-            }
-          }
-        });
-        originalTextBackup.value = null;
-      }
-
-      if (canvas.value) canvas.value.selection = true;
-      await renderAllPages();
-    }
-  } catch (error) {
-    console.error('Preview toggle failed:', error);
-    try {
-      if (!wasPreview && originalTextBackup.value) {
-        togglePreview();
-        isPreviewMode.value = false;
-        originalTextBackup.value = null;
-      } else {
-        isPreviewMode.value = true;
-      }
-    } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError);
-    }
-  }
-};
-
 const loadPageToCanvas = async (index) => {
   if (typeof index === 'number' && index >= 0) currentPageIndex.value = index;
   await renderAllPages();
@@ -1462,12 +1296,10 @@ const syncPagesFromCanvas = () => {
     });
 
     pages.value = newPages;
-    saveCurrentPageState();
   });
 };
 
 const handlePageDrop = async ({ sourceIndex, targetIndex, position }) => {
-  if (!isPreviewMode.value && isCanvasReady.value) saveCurrentPageState();
 
   let insertionIndex = position === 'bottom' ? targetIndex + 1 : targetIndex;
 

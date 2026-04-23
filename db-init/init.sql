@@ -1,8 +1,3 @@
---
--- Sarabun System - Database Init
--- ตรงกับ prisma/schema.prisma (ไม่มี Template)
---
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET client_encoding = 'UTF8';
@@ -16,18 +11,12 @@ SET row_security = off;
 SET default_tablespace = '';
 SET default_table_access_method = heap;
 
--- ============================================
--- Tables
--- ============================================
-
--- User
 CREATE TABLE IF NOT EXISTS public."User" (
     id text NOT NULL,
     username text NOT NULL,
     password text NOT NULL
 );
 
--- Variable
 CREATE TABLE IF NOT EXISTS public."Variable" (
     id text NOT NULL,
     key text NOT NULL,
@@ -36,22 +25,6 @@ CREATE TABLE IF NOT EXISTS public."Variable" (
     "ownerId" text
 );
 
--- ReportInstance
-CREATE TABLE IF NOT EXISTS public."ReportInstance" (
-    id text NOT NULL,
-    name text NOT NULL,
-    "variableSnapshot" jsonb,
-    pages jsonb DEFAULT '[]'::jsonb NOT NULL,
-    status text DEFAULT 'DRAFT'::text NOT NULL,
-    "pdfUrl" text,
-    data jsonb,
-    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updatedAt" timestamp(3) without time zone NOT NULL
-);
-
-
-
--- PdfCache
 CREATE TABLE IF NOT EXISTS public."PdfCache" (
     "OriginalFileId" text NOT NULL,
     "OriginalFile" boolean DEFAULT true NOT NULL,
@@ -66,7 +39,6 @@ CREATE TABLE IF NOT EXISTS public."PdfCache" (
     "lastEditAt" timestamp(3) without time zone NOT NULL
 );
 
--- Signatory
 CREATE TABLE IF NOT EXISTS public."Signatory" (
     id text NOT NULL,
     "fullName" text NOT NULL,
@@ -77,7 +49,6 @@ CREATE TABLE IF NOT EXISTS public."Signatory" (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- StampConfig
 CREATE TABLE IF NOT EXISTS public."StampConfig" (
     id text NOT NULL,
     "schoolName" text DEFAULT 'โรงเรียนทดสอบ'::text NOT NULL,
@@ -86,10 +57,6 @@ CREATE TABLE IF NOT EXISTS public."StampConfig" (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL
 );
-
--- ============================================
--- Primary Keys
--- ============================================
 
 DO $$ BEGIN
     ALTER TABLE ONLY public."User" ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);
@@ -100,13 +67,6 @@ DO $$ BEGIN
     ALTER TABLE ONLY public."Variable" ADD CONSTRAINT "Variable_pkey" PRIMARY KEY (id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
-DO $$ BEGIN
-    ALTER TABLE ONLY public."ReportInstance" ADD CONSTRAINT "ReportInstance_pkey" PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-
 
 DO $$ BEGIN
     ALTER TABLE ONLY public."PdfCache" ADD CONSTRAINT "PdfCache_pkey" PRIMARY KEY ("OriginalFileId");
@@ -123,17 +83,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ============================================
--- Unique Indexes
--- ============================================
-
 CREATE UNIQUE INDEX IF NOT EXISTS "User_username_key" ON public."User" USING btree (username);
 CREATE UNIQUE INDEX IF NOT EXISTS "Signatory_variableName_key" ON public."Signatory" USING btree ("variableName");
 CREATE UNIQUE INDEX IF NOT EXISTS "StampConfig_pdfCacheId_key" ON public."StampConfig" USING btree ("pdfCacheId");
-
--- ============================================
--- Foreign Keys
--- ============================================
 
 DO $$ BEGIN
     ALTER TABLE ONLY public."Variable"
@@ -147,13 +99,6 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ============================================
--- Sample Data (ข้อมูลเริ่มต้น)
--- ============================================
-
-
-
--- Signatories
 INSERT INTO public."Signatory" (id, "fullName", "signatureImage", "variableName", "prefixText", "position", "createdAt") VALUES
 ('8c86513f-50f3-42aa-b4a8-4df5610dd020', 'นายเทสเตอร์ ทดลองระบบ', '/uploads/signatures/signature (2).png', '{{test_sig}}', 'ขอมอบหมายให้ไปทดลองระบบ', 'นักทดลองระบบ', '2026-04-01 03:14:37.428')
 ON CONFLICT (id) DO NOTHING;

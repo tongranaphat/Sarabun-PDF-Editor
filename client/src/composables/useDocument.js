@@ -26,14 +26,12 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
 
   const editorStore = useEditorStore();
   const {
-    variables,
     pages,
     currentPageIndex,
     currentDocumentId,
     currentReportId,
     documentTitle,
-    isSidebarOpen,
-    groupedVariables
+    isSidebarOpen
   } = storeToRefs(editorStore);
 
   const customVarName = ref('');
@@ -189,8 +187,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     return images;
   };
 
-  const fetchVariables = editorStore.fetchVariables;
-
   const saveReport = async (isSilent = false) => {
     if (!canvas.value) return;
     if (typeof _documentCallbacks.saveCurrentPageState === 'function')
@@ -240,13 +236,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     canvas.value.clear();
     canvas.value.setBackgroundColor(null, null);
     if (resetHistory) resetHistory();
-  };
-
-  const addBlankPage = () => {
-    if (pages.value.length > 0 && typeof _documentCallbacks.saveCurrentPageState === 'function') {
-      _documentCallbacks.saveCurrentPageState();
-    }
-    editorStore.addBlankPage();
   };
 
   const handleImportWorkspace = async (e) => {
@@ -310,57 +299,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
       alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
     }
     if (resetHistory) resetHistory();
-  };
-
-  const handleImportAppend = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    e.target.value = '';
-
-    if (pages.value.length > 0 && typeof _documentCallbacks.saveCurrentPageState === 'function') {
-      _documentCallbacks.saveCurrentPageState();
-    }
-
-    const insertIndex = currentPageIndex.value + 1;
-    let newPages = [];
-
-    if (file.type === 'application/pdf') {
-      const images = await processPdfToImages(file);
-      newPages = images.map((imgObj, idx) => ({
-        id: Date.now() + Math.random() + idx,
-        background: imgObj.dataUrl,
-        width: imgObj.width,
-        height: imgObj.height,
-        objects: [],
-        originalBackgroundType: 'PDF'
-      }));
-    } else {
-      alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
-    }
-
-    if (newPages.length > 0) {
-      pages.value.splice(insertIndex, 0, ...newPages);
-      currentPageIndex.value = insertIndex;
-    }
-  };
-
-  const addCustomVariable = () => {
-    const name = prompt('Enter variable name (letters, numbers, underscores only):');
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
-      alert(
-        `Invalid variable name "${trimmed}". Use letters, numbers, and underscores only. Must start with a letter or underscore.`
-      );
-      return;
-    }
-    const alreadyExists = variables.value.some((v) => v.key === trimmed);
-    if (alreadyExists) {
-      alert(`Variable "${trimmed}" already exists.`);
-      return;
-    }
-    variables.value.push({ category: 'Custom', label: trimmed, key: trimmed });
   };
 
   const togglePagesSidebar = () => {
@@ -504,7 +442,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
                   console.warn('Failed to add auto stamp', e);
                 }
               }
-
             } catch (uploadError) {
               console.error('Upload failed:', uploadError);
 
@@ -573,8 +510,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
   };
 
   return {
-    variables,
-    customVarName,
     documentTitle,
     currentBackground,
     currentDocumentId,
@@ -583,15 +518,10 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     pages,
     currentPageIndex,
     isSidebarOpen,
-    groupedVariables,
 
-    fetchVariables,
     saveReport,
     resetCanvas,
     handleImportWorkspace,
-    handleImportAppend,
-    addBlankPage,
-    addCustomVariable,
     togglePagesSidebar,
     getDefaultPageImage,
     cleanFabricObject,

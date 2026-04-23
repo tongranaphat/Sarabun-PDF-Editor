@@ -30,9 +30,20 @@
           <span class="icon-redo"></span>
           <span class="action-text">ทำซ้ำ</span>
         </button>
-        <button @click="$emit('reset-project')" class="action-btn-text btn-reset-navbar" title="เริ่มใหม่จากต้นฉบับ">
-          <svg class="reset-icon-navbar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
+        <button
+          @click="$emit('reset-project')"
+          class="action-btn-text btn-reset-navbar"
+          title="เริ่มใหม่จากต้นฉบับ"
+        >
+          <svg
+            class="reset-icon-navbar"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
             <path d="M3 3v5h5"></path>
           </svg>
@@ -43,26 +54,42 @@
       <div class="divider-v"></div>
 
       <div class="action-group">
-        <button @click="$emit('save-report')" class="btn-save-navbar" :disabled="isGenerating" title="บันทึกโปรเจกต์">
-          <span class="btn-save-navbar-text">บันทึกโปรเจกต์</span>
+        <button
+          @click="$emit('save-report')"
+          class="btn-save-navbar"
+          :disabled="isGenerating"
+          title="บันทึกไฟล์"
+        >
+          <span class="btn-save-navbar-text">บันทึก</span>
         </button>
 
         <div class="export-dropdown-wrapper" ref="dropdownRef">
           <div class="export-btn-group">
-            <button @click="$emit('generate-pdf')" class="btn-export-navbar" :disabled="isGenerating"
-              title="ส่งออกเป็นไฟล์ PDF">
+            <button
+              @click="$emit('generate-pdf')"
+              class="btn-export-navbar"
+              :disabled="isGenerating"
+              title="ส่งออกเป็นไฟล์ PDF"
+            >
               <span class="btn-export-navbar-text">
                 {{ isGenerating ? 'กำลังสร้าง...' : 'ส่งออก PDF' }}
               </span>
             </button>
-            <button @click="toggleDropdown" class="btn-export-dropdown-toggle" :disabled="isGenerating"
-              title="เลือกคุณภาพ PDF">
+            <button
+              @click="toggleDropdown"
+              class="btn-export-dropdown-toggle"
+              :disabled="isGenerating"
+              title="เลือกคุณภาพ PDF"
+            >
               <span class="dropdown-arrow" :class="{ open: showDropdown }">▾</span>
             </button>
           </div>
           <div class="export-dropdown-menu" v-if="showDropdown">
             <div class="dropdown-header">คุณภาพ PDF</div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '1' }]" @click="selectQuality('1')">
+            <div
+              :class="['dropdown-quality-item', { active: pdfQuality == '1' }]"
+              @click="selectQuality('1')"
+            >
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '1'"></div>
               </div>
@@ -72,7 +99,10 @@
               </div>
               <span class="quality-badge">1x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '2' }]" @click="selectQuality('2')">
+            <div
+              :class="['dropdown-quality-item', { active: pdfQuality == '2' }]"
+              @click="selectQuality('2')"
+            >
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '2'"></div>
               </div>
@@ -82,7 +112,10 @@
               </div>
               <span class="quality-badge">2x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '3' }]" @click="selectQuality('3')">
+            <div
+              :class="['dropdown-quality-item', { active: pdfQuality == '3' }]"
+              @click="selectQuality('3')"
+            >
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '3'"></div>
               </div>
@@ -92,7 +125,10 @@
               </div>
               <span class="quality-badge">3x</span>
             </div>
-            <div :class="['dropdown-quality-item', { active: pdfQuality == '4' }]" @click="selectQuality('4')">
+            <div
+              :class="['dropdown-quality-item', { active: pdfQuality == '4' }]"
+              @click="selectQuality('4')"
+            >
               <div class="quality-radio">
                 <div class="quality-radio-inner" v-if="pdfQuality == '4'"></div>
               </div>

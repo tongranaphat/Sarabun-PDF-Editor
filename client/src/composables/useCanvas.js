@@ -50,6 +50,23 @@ export function useCanvas() {
 
   const initCanvas = () => {
     if (canvas.value) return;
+
+    fabric.Object.prototype.set({
+      transparentCorners: false,
+      cornerColor: '#ffffff',
+      cornerStrokeColor: '#ff85ab',
+      borderColor: '#ff85ab',
+      editingBorderColor: '#ff85ab',
+      cornerSize: 8,
+      borderScaleFactor: 1.5,
+      padding: 5,
+      cornerStyle: 'circle',
+      borderOpacityWhenMoving: 0.6
+    });
+
+    fabric.Textbox.prototype.editingBorderColor = '#ff85ab';
+    fabric.IText.prototype.editingBorderColor = '#ff85ab';
+
     fabric.devicePixelRatio = 1;
     canvas.value = new fabric.Canvas('c', {
       width: CANVAS_CONSTANTS.PAGE_WIDTH,
@@ -182,31 +199,6 @@ export function useCanvas() {
     redoStack.value = [];
   };
 
-  const addVariableToCanvas = (key, x = 100, y = 100) => {
-    if (!canvas.value) return;
-    const textObj = new fabric.Textbox(`{{${key}}}`, {
-      id: uuidv4(),
-      left: x,
-      top: y,
-      width: 200,
-      fontSize: 16,
-      fontFamily: 'Sarabun',
-      fill: '#000000',
-      editable: true
-    });
-
-    if (typeof _callbacks.forceUnlockObject === 'function') {
-      _callbacks.forceUnlockObject(textObj);
-    } else {
-      textObj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true });
-    }
-
-    canvas.value.add(textObj);
-    canvas.value.setActiveObject(textObj);
-    if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
-    saveHistory();
-  };
-
   const wrapThaiText = (text, maxWidth, fontSize, fontFamily) => {
     if (!text) return '';
     if (!window.Intl || !Intl.Segmenter) return text;
@@ -333,43 +325,22 @@ export function useCanvas() {
     sigGroup.on('removed', () => handleDeletion(sigGroup));
   };
 
-  const addSignatureBlockToCanvas = (sigData, dropX = 100, dropY = 100) => {
+  const addSignatureBlockToCanvas = (
+    sigData,
+    dropX = 100,
+    dropY = 100,
+    customPrefixText = null
+  ) => {
     if (!canvas.value) return;
 
     const maxTextWidth = 145;
     const fontSize = 13;
     const fontFamily = 'Sarabun';
-
     const GAP = 3;
 
     const sharedLinkedId = `link_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    let prefixTextbox = null;
-
-    if (sigData.prefixText) {
-      const wrappedPrefix =
-        typeof wrapThaiText === 'function'
-          ? wrapThaiText(sigData.prefixText, maxTextWidth, fontSize, fontFamily)
-          : sigData.prefixText;
-
-      prefixTextbox = new fabric.Textbox(wrappedPrefix, {
-        left: dropX,
-        top: dropY,
-        fontSize: fontSize,
-        fontFamily: fontFamily,
-        textAlign: 'center',
-        width: maxTextWidth + 10,
-        originX: 'center',
-        originY: 'top',
-        id: `prefix_${sharedLinkedId}`,
-        name: `ข้อความ: ${sigData.fullName}`,
-        isSignaturePrefix: true,
-        linkedId: sharedLinkedId
-      });
-      canvas.value.add(prefixTextbox);
-    }
-
-    const buildAndLinkSignatureGroup = (imgObj = null) => {
+    const buildUnifiedSignatureGroup = (imgObj = null) => {
       const objects = [];
       let currentInternalY = 0;
       const centerX = 0;
@@ -382,15 +353,47 @@ export function useCanvas() {
         fill: 'transparent',
         originX: 'center',
         originY: 'top',
-        selectable: false
+        selectable: false,
+        evented: false
       });
       objects.push(balancer);
 
+      const textToShow = customPrefixText !== null ? customPrefixText : sigData.prefixText;
+
+      if (textToShow && textToShow.trim() !== '') {
+        const wrappedPrefix =
+          typeof wrapThaiText === 'function'
+            ? wrapThaiText(textToShow, maxTextWidth, fontSize, fontFamily)
+            : textToShow;
+
+        const prefixTextbox = new fabric.Textbox(wrappedPrefix, {
+          left: centerX,
+          top: currentInternalY,
+          fontSize: fontSize,
+          fontFamily: fontFamily,
+          textAlign: 'center',
+          width: maxTextWidth + 10,
+          originX: 'center',
+          originY: 'top',
+          editable: false,
+          selectable: false,
+          evented: false
+        });
+        objects.push(prefixTextbox);
+        currentInternalY += prefixTextbox.getScaledHeight() + GAP + 5;
+      }
+
       if (imgObj) {
         imgObj.scaleToHeight(30);
-        imgObj.set({ originX: 'center', originY: 'top', top: currentInternalY, left: centerX });
+        imgObj.set({
+          originX: 'center',
+          originY: 'top',
+          top: currentInternalY,
+          left: centerX,
+          selectable: false,
+          evented: false
+        });
         objects.push(imgObj);
-
         currentInternalY += imgObj.getScaledHeight() + 5;
       } else {
         currentInternalY += 30;
@@ -402,10 +405,11 @@ export function useCanvas() {
         originX: 'center',
         originY: 'top',
         top: currentInternalY,
-        left: centerX
+        left: centerX,
+        selectable: false,
+        evented: false
       });
       objects.push(nameText);
-
       currentInternalY += nameText.height + 2;
 
       if (sigData.position) {
@@ -421,80 +425,31 @@ export function useCanvas() {
           originY: 'top',
           textAlign: 'center',
           top: currentInternalY,
-          left: centerX
+          left: centerX,
+          selectable: false,
+          evented: false
         });
         objects.push(bottomText);
       }
 
-      let sigTopY = dropY;
-      if (prefixTextbox) {
-        sigTopY = prefixTextbox.top + prefixTextbox.getScaledHeight() + GAP;
-      }
-
-      const sigGroup = new fabric.Group(objects, {
+      const unifiedGroup = new fabric.Group(objects, {
         left: dropX,
-        top: sigTopY,
+        top: dropY,
         originX: 'center',
         originY: 'top',
         isSignatureBlock: true,
-        linkedId: sharedLinkedId,
         sigData: sigData,
         id: `signature_${sharedLinkedId}`,
-        name: `กลุ่มชื่อ: ${sigData.fullName}`
+        name: `ลายเซ็น: ${sigData.fullName}`,
+        subTargetCheck: false
       });
 
-      canvas.value.add(sigGroup);
-
-      if (prefixTextbox) {
-        linkSignatureBlocks(canvas.value, prefixTextbox, sigGroup, GAP);
-        const sel = new fabric.ActiveSelection([prefixTextbox, sigGroup], { canvas: canvas.value });
-        canvas.value.setActiveObject(sel);
-
-        if (!canvas.value.__hasSmartDblClick) {
-          canvas.value.on('mouse:dblclick', (e) => {
-            const activeObj = canvas.value.getActiveObject();
-            if (activeObj && activeObj.type === 'activeSelection') {
-              const pointer = canvas.value.getPointer(e.e);
-              const objectsInSelection = [...activeObj.getObjects()];
-              canvas.value.discardActiveObject();
-
-              let innerTarget = null;
-              for (let i = 0; i < objectsInSelection.length; i++) {
-                const obj = objectsInSelection[i];
-                obj.setCoords();
-                if (obj.containsPoint(pointer)) {
-                  innerTarget = obj;
-                  break;
-                }
-              }
-
-              if (innerTarget && innerTarget.isSignaturePrefix) {
-                canvas.value.setActiveObject(innerTarget);
-                canvas.value.requestRenderAll();
-                setTimeout(() => {
-                  innerTarget.enterEditing();
-                  innerTarget.selectAll();
-                  canvas.value.requestRenderAll();
-                }, 50);
-              } else if (innerTarget) {
-                canvas.value.setActiveObject(innerTarget);
-                canvas.value.requestRenderAll();
-              } else {
-                const sel = new fabric.ActiveSelection(objectsInSelection, {
-                  canvas: canvas.value
-                });
-                canvas.value.setActiveObject(sel);
-                canvas.value.requestRenderAll();
-              }
-            }
-          });
-          canvas.value.__hasSmartDblClick = true;
-        }
-      } else {
-        canvas.value.setActiveObject(sigGroup);
-      }
-
+      canvas.value.add(unifiedGroup);
+      canvas.value.setActiveObject(unifiedGroup);
       canvas.value.requestRenderAll();
+
+      if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
+      saveHistory();
     };
 
     if (sigData.signatureImage) {
@@ -510,13 +465,13 @@ export function useCanvas() {
       fabric.Image.fromURL(
         imageUrl,
         (img, isError) => {
-          if (!isError && img) buildAndLinkSignatureGroup(img);
-          else buildAndLinkSignatureGroup();
+          if (!isError && img) buildUnifiedSignatureGroup(img);
+          else buildUnifiedSignatureGroup();
         },
         { crossOrigin: 'anonymous' }
       );
     } else {
-      buildAndLinkSignatureGroup();
+      buildUnifiedSignatureGroup();
     }
   };
 
@@ -562,9 +517,13 @@ export function useCanvas() {
     const labels = [];
     const values = [];
 
-    fieldsData.forEach(field => {
+    fieldsData.forEach((field) => {
       const labelItem = new fabric.Text(field.label, { fontSize, fontFamily, fill: '#000000' });
-      const valItem = new fabric.Text(field.val, { fontSize: fontSize + 1, fontFamily, fill: '#000000' });
+      const valItem = new fabric.Text(field.val, {
+        fontSize: fontSize + 1,
+        fontFamily,
+        fill: '#000000'
+      });
       labels.push(labelItem);
       values.push(valItem);
       if (valItem.width > maxValWidth) {
@@ -583,7 +542,7 @@ export function useCanvas() {
       left: blockWidth / 2,
       top: currentY,
       originX: 'center',
-      originY: 'top',
+      originY: 'top'
     });
     objects.push(schoolText);
     currentY += schoolText.height + 5;
@@ -594,11 +553,11 @@ export function useCanvas() {
 
       labelItem.set({ left: 10, top: currentY });
       const valCenter = 60 + (blockWidth - 10 - 60) / 2;
-      valItem.set({ 
-        left: valCenter, 
-        top: currentY - 1, 
-        originX: 'center', 
-        originY: 'top' 
+      valItem.set({
+        left: valCenter,
+        top: currentY - 1,
+        originX: 'center',
+        originY: 'top'
       });
 
       objects.push(labelItem, valItem);
@@ -621,17 +580,33 @@ export function useCanvas() {
     let dropX = CANVAS_CONSTANTS.PAGE_WIDTH - blockWidth - 20;
     let dropY = 30;
 
-    const allBgObjects = canvas.value.getObjects().filter(o => o.id === 'page-bg' || o.id === 'page-bg-image');
+    const allBgObjects = canvas.value
+      .getObjects()
+      .filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image');
     console.log('[STAMP-POS] BG objects found:', allBgObjects.length);
-    console.log('[STAMP-POS] All canvas objects:', canvas.value.getObjects().map(o => ({ id: o.id, type: o.type, left: o.left, top: o.top, w: o.getScaledWidth?.() })));
+    console.log(
+      '[STAMP-POS] All canvas objects:',
+      canvas.value
+        .getObjects()
+        .map((o) => ({ id: o.id, type: o.type, left: o.left, top: o.top, w: o.getScaledWidth?.() }))
+    );
     if (allBgObjects.length > 0) {
       allBgObjects.sort((a, b) => a.top - b.top);
       const firstPage = allBgObjects[0];
       dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 20;
       dropY = firstPage.top + 30;
-      console.log('[STAMP-POS] Using BG position:', { bgLeft: firstPage.left, bgWidth: firstPage.getScaledWidth(), dropX, dropY });
+      console.log('[STAMP-POS] Using BG position:', {
+        bgLeft: firstPage.left,
+        bgWidth: firstPage.getScaledWidth(),
+        dropX,
+        dropY
+      });
     } else {
-      console.log('[STAMP-POS] No BG found, using defaults:', { dropX, dropY, PAGE_WIDTH: CANVAS_CONSTANTS.PAGE_WIDTH });
+      console.log('[STAMP-POS] No BG found, using defaults:', {
+        dropX,
+        dropY,
+        PAGE_WIDTH: CANVAS_CONSTANTS.PAGE_WIDTH
+      });
     }
 
     const stampGroup = new fabric.Group(objects, {
@@ -647,8 +622,13 @@ export function useCanvas() {
     canvas.value.add(stampGroup);
     canvas.value.setActiveObject(stampGroup);
     canvas.value.requestRenderAll();
-    console.log('[STAMP-POS] Stamp group added at:', { left: stampGroup.left, top: stampGroup.top, w: stampGroup.width, h: stampGroup.height });
-    
+    console.log('[STAMP-POS] Stamp group added at:', {
+      left: stampGroup.left,
+      top: stampGroup.top,
+      w: stampGroup.width,
+      h: stampGroup.height
+    });
+
     if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
     saveHistory();
   };
@@ -677,9 +657,12 @@ export function useCanvas() {
 
   const removeSelectedObject = () => {
     if (!canvas.value) return;
-    const active = canvas.value.getActiveObject();
-    if (active) {
-      canvas.value.remove(active);
+    const activeObjects = canvas.value.getActiveObjects();
+    if (activeObjects.length > 0) {
+      activeObjects.forEach((obj) => {
+        canvas.value.remove(obj);
+      });
+      canvas.value.discardActiveObject().requestRenderAll();
       if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
       saveHistory();
     }
@@ -690,7 +673,6 @@ export function useCanvas() {
   };
   const onDrop = (e) => {
     const key = e.dataTransfer.getData('variable');
-    if (key) addVariableToCanvas(key);
   };
 
   const saveCurrentPageStateAtomic = (canvas, pages, zoomLevel) => {
@@ -920,54 +902,6 @@ export function useCanvas() {
     zoomLevel.value = 1;
   };
 
-  const bringForward = (objOrId) => {
-    if (!canvas.value) return;
-    const obj =
-      typeof objOrId === 'string'
-        ? canvas.value.getObjects().find((o) => o.id === objOrId || o.nodeId === objOrId)
-        : objOrId;
-    if (obj) {
-      canvas.value.bringForward(obj);
-      saveHistory();
-    }
-  };
-
-  const sendBackwards = (objOrId) => {
-    if (!canvas.value) return;
-    const obj =
-      typeof objOrId === 'string'
-        ? canvas.value.getObjects().find((o) => o.id === objOrId || o.nodeId === objOrId)
-        : objOrId;
-    if (obj) {
-      canvas.value.sendBackwards(obj);
-      saveHistory();
-    }
-  };
-
-  const bringToFront = (objOrId) => {
-    if (!canvas.value) return;
-    const obj =
-      typeof objOrId === 'string'
-        ? canvas.value.getObjects().find((o) => o.id === objOrId || o.nodeId === objOrId)
-        : objOrId;
-    if (obj) {
-      canvas.value.bringToFront(obj);
-      saveHistory();
-    }
-  };
-
-  const sendToBack = (objOrId) => {
-    if (!canvas.value) return;
-    const obj =
-      typeof objOrId === 'string'
-        ? canvas.value.getObjects().find((o) => o.id === objOrId || o.nodeId === objOrId)
-        : objOrId;
-    if (obj) {
-      canvas.value.sendToBack(obj);
-      saveHistory();
-    }
-  };
-
   const getMemoryStats = () => {
     return { ...memoryStats };
   };
@@ -1076,7 +1010,6 @@ export function useCanvas() {
     canRedo: computed(() => redoStack.value.length > 0),
 
     initCanvas,
-    addVariableToCanvas,
     removeSelectedObject,
     addImageToCanvas,
     onDragStart,
@@ -1087,11 +1020,6 @@ export function useCanvas() {
     zoomIn,
     zoomOut,
     fitToScreen,
-
-    bringForward,
-    sendBackwards,
-    bringToFront,
-    sendToBack,
 
     cleanupCanvasObjects,
     getMemoryStats,

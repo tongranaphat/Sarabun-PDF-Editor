@@ -1,16 +1,37 @@
 <template>
   <div class="app-layout">
-    <TopNavbar :zoom-level="zoomLevel" :is-generating="isGenerating" :pdf-quality="pdfQuality" @go-home="goHome"
-      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @save-report="handleSaveProject"
-      @generate-pdf="handleExport" @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
+    <TopNavbar
+      :zoom-level="zoomLevel"
+      :is-generating="isGenerating"
+      :pdf-quality="pdfQuality"
+      @go-home="goHome"
+      @undo="undo"
+      @redo="redo"
+      @zoom-in="zoomIn"
+      @zoom-out="zoomOut"
+      @save-report="handleSaveProject"
+      @generate-pdf="handleExport"
+      @reset-project="handleReset"
+      @update:pdfQuality="pdfQuality = $event"
+    />
 
-    <Sidebar :isOpen="isSidebarOpen" :connectionStatus="connectionStatus" :isCanvasReady="isCanvasReady"
-      :groupedVariables="groupedVariables" :pages="pages" :currentPageIndex="currentPageIndex" @toggle="toggleSidebar"
-      @open="isSidebarOpen = true" @close="isSidebarOpen = false" @reset-canvas="goHome"
-      @import-workspace="handleImportWorkspaceWrapper" @add-variable="handleAddVariable" @delete-page="deletePage"
-      @add-page="addBlankPageWrapper" @import-page="handleAppendPageWrapper" @page-click="scrollToPage"
-      @page-drop="handlePageDrop" @add-signature-block="handleAddSignatureBlock"
-      @add-custom-variable="addCustomVariable" />
+    <Sidebar
+      :isOpen="isSidebarOpen"
+      :connectionStatus="connectionStatus"
+      :isCanvasReady="isCanvasReady"
+      :pages="pages"
+      :currentPageIndex="currentPageIndex"
+      @toggle="toggleSidebar"
+      @open="isSidebarOpen = true"
+      @close="isSidebarOpen = false"
+      @reset-canvas="goHome"
+      @import-workspace="handleImportWorkspaceWrapper"
+      @delete-page="deletePage"
+      @page-click="scrollToPage"
+      @page-drop="handlePageDrop"
+      @add-signature-block="handleAddSignatureBlock"
+      @add-custom-variable="() => {}"
+    />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
       <div class="scroll-center-helper">
@@ -28,8 +49,20 @@
       <PropertiesPanel :canvas="canvas" />
     </div>
 
-    <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
-      :total="exportOverlay.total" :stage="exportOverlay.stage" />
+    <ExportOverlay
+      :visible="exportOverlay.visible"
+      :title="exportOverlay.title"
+      :current="exportOverlay.current"
+      :total="exportOverlay.total"
+      :stage="exportOverlay.stage"
+    />
+
+    <SignatureModal
+      :is-visible="signatureModal.visible"
+      :sig-data="signatureModal.data"
+      @confirm="handleSignatureConfirm"
+      @cancel="handleSignatureCancel"
+    />
   </div>
 </template>
 
@@ -40,6 +73,7 @@ import TopNavbar from '../components/TopNavbar.vue';
 import PropertiesPanel from '../components/PropertiesPanel.vue';
 import Sidebar from '../components/Sidebar.vue';
 import ExportOverlay from '../components/ExportOverlay.vue';
+import SignatureModal from '../components/SignatureModal.vue';
 
 import { useCanvas } from '../composables/useCanvas';
 import { useDocument } from '../composables/useDocument';
@@ -51,7 +85,6 @@ import { CANVAS_CONSTANTS } from '../constants/canvas';
 import { showNotification } from '../utils/notifications';
 import { yieldToMain } from '../utils/yieldToMain';
 import apiService from '../services/apiService';
-
 
 const currentPdfId = computed(() => {
   const parts = window.location.pathname.split('/');
@@ -70,7 +103,7 @@ const canvasBaseDimensions = ref({
 const connectionStatus = ref('offline');
 const isGenerating = ref(false);
 const pdfQuality = ref(2);
-const pdfMode = 'flatten';
+const pdfMode = ref('flatten');
 const pdfUrl = ref(null);
 let isRendering = false;
 
@@ -100,6 +133,11 @@ const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value;
 };
 
+const signatureModal = ref({
+  visible: false,
+  data: null
+});
+
 let activePdfId = null;
 
 const triggerTempCleanup = () => {
@@ -111,28 +149,10 @@ const triggerTempCleanup = () => {
     if (navigator.sendBeacon) {
       navigator.sendBeacon(cleanupUrl);
     } else {
-      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => { });
+      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => {});
     }
 
     activePdfId = null;
-  }
-};
-
-const fetchReports = async () => {
-  try {
-    reportHistory.value = await apiService.getReports();
-  } catch (e) {
-    console.error('Failed to fetch reports', e);
-  }
-};
-
-const handleDeleteReport = async (instance) => {
-  if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรายงาน "${instance.name}"?`)) return;
-  try {
-    await apiService.deleteReport(instance.id);
-    await fetchReports();
-  } catch (e) {
-    alert('ลบรายงานล้มเหลว: ' + e.message);
   }
 };
 
@@ -214,8 +234,6 @@ const handleUrlImport = async (url) => {
   }
 };
 
-const reportHistory = ref([]);
-
 const {
   canvas,
   zoomLevel,
@@ -232,7 +250,6 @@ const {
   undo,
   redo,
 
-  addVariableToCanvas,
   addSignatureBlockToCanvas,
   addStampBlockToCanvas,
   setHistoryContext,
@@ -245,10 +262,7 @@ const {
 
 const canvasHelpers = { resetHistory, saveHistory, setHistoryLock, addStampBlockToCanvas };
 
-
-
 const {
-  variables,
   documentTitle,
   currentDocumentId,
   currentReportId,
@@ -256,14 +270,10 @@ const {
   currentPageIndex,
   isSidebarOpen,
   isPagesSidebarOpen,
-  groupedVariables,
-  fetchVariables,
+
   saveReport,
   resetCanvas,
   handleImportWorkspace,
-  handleImportAppend,
-  addBlankPage,
-  addCustomVariable,
   getDefaultPageImage,
   cleanFabricObject,
   preparePagesForSave,
@@ -290,18 +300,30 @@ const { generateHybridPdfBlob, captureCanvasPageSafe } = useEditablePdf();
 
 const editorStore = useEditorStore();
 
-watch(zoomLevel, (newZoom) => {
-  if (canvas.value && canvasBaseDimensions.value) {
+watch(zoomLevel, async (newZoom, oldZoom) => {
+  if (canvas.value && canvasBaseDimensions.value && viewportRef.value) {
+    const viewport = viewportRef.value;
+    const oldScrollLeft = viewport.scrollLeft;
+    const oldScrollTop = viewport.scrollTop;
+    const viewWidth = viewport.clientWidth;
+    const viewHeight = viewport.clientHeight;
+
+    const centerX = (oldScrollLeft + viewWidth / 2) / oldZoom;
+    const centerY = (oldScrollTop + viewHeight / 2) / oldZoom;
+
     canvas.value.setDimensions({
       width: canvasBaseDimensions.value.width * newZoom,
       height: canvasBaseDimensions.value.height * newZoom
     });
     canvas.value.setZoom(newZoom);
     canvas.value.requestRenderAll();
+
+    await nextTick();
+
+    viewport.scrollLeft = centerX * newZoom - viewWidth / 2;
+    viewport.scrollTop = centerY * newZoom - viewHeight / 2;
   }
 });
-
-
 
 const handleReset = async () => {
   const fileIdToReset = window.location.pathname.split('/').pop();
@@ -373,7 +395,7 @@ const handleSaveProject = async () => {
   }
 
   try {
-    showExportOverlay('กำลังบันทึกโปรเจกต์...', pages.value.length + 2);
+    showExportOverlay('กำลังบันทึกไฟล์...', pages.value.length + 2);
     updateExportProgress(0, 'กำลังเตรียมข้อมูล...');
     saveCurrentPageState();
 
@@ -528,20 +550,17 @@ const handleSaveProject = async () => {
       const savedData = await apiService.savePdfState(formData);
 
       if (savedData) {
-        showNotification('บันทึกโปรเจกต์ลง Database พร้อมฝัง PDF เรียบร้อย!', 'success');
+        showNotification('บันทึกไฟล์เรียบร้อย!', 'success');
         console.log('Database state saved/updated successfully!');
 
         try {
           const historyPayload = {
-            name: documentTitle.value || 'โปรเจกต์ที่บันทึกแล้ว',
+            name: documentTitle.value || 'ไฟล์ที่บันทึกแล้ว',
             pages: pages.value,
             data: JSON.stringify(pages.value),
             pdfUrl: savedData.filepath || null,
             documentId: currentDocumentId.value || null
           };
-          await apiService.createReport(historyPayload);
-
-          if (typeof fetchReports === 'function') fetchReports();
         } catch (err) {
           console.error('Failed to log database save to history', err);
         }
@@ -564,7 +583,7 @@ const handleSaveProject = async () => {
     }
   } catch (e) {
     console.error('Save Project failed:', e);
-    showNotification('เกิดข้อผิดพลาดในการบันทึกโปรเจกต์: ' + e.message, 'error');
+    showNotification('เกิดข้อผิดพลาดในการบันทึกไฟล์: ' + e.message, 'error');
   } finally {
     hideExportOverlay();
   }
@@ -757,14 +776,7 @@ const handleExport = async () => {
           documentId: currentDocumentId.value || null
         };
 
-        const result = await apiService.createReport(historyPayload);
-
-        if (result && result.id) {
-          currentReportId.value = result.id;
-        }
-
-        showNotification('ส่งออก PDF และบันทึกประวัติสำเร็จ!', 'success');
-        if (typeof fetchReports === 'function') fetchReports();
+        showNotification('ส่งออก PDF สำเร็จ!', 'success');
       } catch (e) {
         console.error('Failed to log export history:', e);
         showNotification('ส่งออก PDF สำเร็จ แต่บันทึกประวัติลง Database ล้มเหลว', 'warning');
@@ -793,8 +805,6 @@ const handleExport = async () => {
   }
 };
 
-
-
 const resetCanvasWrapper = async () => {
   await resetCanvas();
   await nextTick();
@@ -818,38 +828,33 @@ const handleImportWorkspaceWrapper = async () => {
   saveHistory();
 };
 
-const handleAppendPageWrapper = async (e) => {
-  await handleImportAppend(e);
-  await nextTick();
-  await renderAllPages();
-  saveHistory();
-};
-
-const addBlankPageWrapper = async () => {
-  addBlankPage();
-  await nextTick();
-  await renderAllPages();
-  saveHistory();
-};
-
 const handleAddSignatureBlock = (sigData) => {
-  if (!canvas.value) return;
+  signatureModal.value = {
+    visible: true,
+    data: sigData
+  };
+};
+
+const handleSignatureConfirm = (customText) => {
+  if (!canvas.value || !signatureModal.value.data) return;
+
   const targetTop = getPageTopOffset(currentPageIndex.value) + 100;
   const targetLeft = getWorkspaceMaxWidth() / 2;
 
-  addSignatureBlockToCanvas(sigData, targetLeft, targetTop);
+  addSignatureBlockToCanvas(signatureModal.value.data, targetLeft, targetTop, customText);
+
+  signatureModal.value = {
+    visible: false,
+    data: null
+  };
 };
 
-const handleAddVariable = (key) => {
-  if (!canvas.value) return;
-  const targetTop = getPageTopOffset(currentPageIndex.value) + 100;
-  const targetLeft = getWorkspaceMaxWidth() / 2;
-
-  addVariableToCanvas(key, targetLeft - 100, targetTop);
+const handleSignatureCancel = () => {
+  signatureModal.value = {
+    visible: false,
+    data: null
+  };
 };
-
-
-
 
 const cleanupCanvasObjects = () => {
   if (!canvas.value) return;
@@ -900,7 +905,7 @@ const renderAllPages = async () => {
 
     canvas.value.discardActiveObject();
     canvas.value.clear();
-    canvas.value.setBackgroundColor(null, () => { });
+    canvas.value.setBackgroundColor(null, () => {});
 
     const actualZoom = zoomLevel.value || 1;
 
@@ -1148,7 +1153,6 @@ window.addCustomTextToCanvas = addCustomTextToCanvas;
 let isSavingState = false;
 
 const saveCurrentPageState = () => {
-
   isSavingState = true;
   try {
     if (
@@ -1300,7 +1304,6 @@ const syncPagesFromCanvas = () => {
 };
 
 const handlePageDrop = async ({ sourceIndex, targetIndex, position }) => {
-
   let insertionIndex = position === 'bottom' ? targetIndex + 1 : targetIndex;
 
   const [movedPage] = pages.value.splice(sourceIndex, 1);
@@ -1315,8 +1318,6 @@ const handlePageDrop = async ({ sourceIndex, targetIndex, position }) => {
 
 const onDrop = (e) => {
   e.preventDefault();
-
-  const variable = e.dataTransfer.getData('variable');
 
   let x = 0;
   let y = 0;
@@ -1340,7 +1341,6 @@ const onDrop = (e) => {
     }
   }
 
-  if (variable && typeof addVariableToCanvas !== 'undefined') addVariableToCanvas(variable, x, y);
   const customText = e.dataTransfer.getData('customText');
   if (customText) addCustomTextToCanvas(x, y);
 
@@ -1400,17 +1400,24 @@ const handleRouteChange = async () => {
           currentPageIndex.value = 0;
           await nextTick();
 
-          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
-            Array.isArray(page.objects) && page.objects.some(obj =>
-              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-            )
-          );
+          const hasStamp =
+            Array.isArray(parsedState) &&
+            parsedState.some(
+              (page) =>
+                Array.isArray(page.objects) &&
+                page.objects.some(
+                  (obj) =>
+                    (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+                )
+            );
           console.log('[STAMP-DEBUG] editState has stamp:', hasStamp);
 
-          await new Promise(r => setTimeout(async () => {
-            if (typeof renderAllPages === 'function') await renderAllPages();
-            r();
-          }, 500));
+          await new Promise((r) =>
+            setTimeout(async () => {
+              if (typeof renderAllPages === 'function') await renderAllPages();
+              r();
+            }, 500)
+          );
 
           if (!hasStamp) {
             try {
@@ -1431,15 +1438,21 @@ const handleRouteChange = async () => {
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
                     console.log('[STAMP-DEBUG] Stamp auto-saved!');
-                  } catch (err) { console.error('[STAMP-DEBUG] Auto-save stamp failed', err); }
+                  } catch (err) {
+                    console.error('[STAMP-DEBUG] Auto-save stamp failed', err);
+                  }
                 }, 500);
               }
-            } catch (e) { console.warn('[STAMP-DEBUG] Stamp add failed', e); }
+            } catch (e) {
+              console.warn('[STAMP-DEBUG] Stamp add failed', e);
+            }
           }
         } else {
           console.log('[STAMP-DEBUG] No editState, rendering PDF from scratch');
           const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-          const downloadedFile = new File([blobData], 'url_import.pdf', { type: 'application/pdf' });
+          const downloadedFile = new File([blobData], 'url_import.pdf', {
+            type: 'application/pdf'
+          });
 
           await resetCanvasWrapper();
           const images = await processPdfToImages(downloadedFile);
@@ -1474,10 +1487,14 @@ const handleRouteChange = async () => {
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
                     console.log('[STAMP-DEBUG] Stamp auto-saved!');
-                  } catch (err) { console.error('[STAMP-DEBUG] Auto-save stamp failed', err); }
+                  } catch (err) {
+                    console.error('[STAMP-DEBUG] Auto-save stamp failed', err);
+                  }
                 }, 500);
               }
-            } catch (e) { console.warn('[STAMP-DEBUG] Stamp add failed', e); }
+            } catch (e) {
+              console.warn('[STAMP-DEBUG] Stamp add failed', e);
+            }
           }
         }
         return true;
@@ -1510,16 +1527,23 @@ const handleRouteChange = async () => {
           currentPageIndex.value = 0;
           await nextTick();
 
-          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
-            Array.isArray(page.objects) && page.objects.some(obj =>
-              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-            )
-          );
+          const hasStamp =
+            Array.isArray(parsedState) &&
+            parsedState.some(
+              (page) =>
+                Array.isArray(page.objects) &&
+                page.objects.some(
+                  (obj) =>
+                    (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+                )
+            );
 
-          await new Promise(r => setTimeout(async () => {
-            if (typeof renderAllPages === 'function') await renderAllPages();
-            r();
-          }, 500));
+          await new Promise((r) =>
+            setTimeout(async () => {
+              if (typeof renderAllPages === 'function') await renderAllPages();
+              r();
+            }, 500)
+          );
 
           if (!hasStamp) {
             try {
@@ -1534,14 +1558,20 @@ const handleRouteChange = async () => {
                     fd.append('OriginalFileId', newPdfId);
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
-                  } catch (err) { console.error('Auto-save stamp failed', err); }
+                  } catch (err) {
+                    console.error('Auto-save stamp failed', err);
+                  }
                 }, 500);
               }
-            } catch (e) { console.warn('Stamp add failed', e); }
+            } catch (e) {
+              console.warn('Stamp add failed', e);
+            }
           }
         } else {
           const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-          const downloadedFile = new File([blobData], 'local_import.pdf', { type: 'application/pdf' });
+          const downloadedFile = new File([blobData], 'local_import.pdf', {
+            type: 'application/pdf'
+          });
 
           await resetCanvasWrapper();
           const images = await processPdfToImages(downloadedFile);
@@ -1569,10 +1599,14 @@ const handleRouteChange = async () => {
                     fd.append('OriginalFileId', newPdfId);
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
-                  } catch (err) { console.error('Auto-save stamp failed', err); }
+                  } catch (err) {
+                    console.error('Auto-save stamp failed', err);
+                  }
                 }, 500);
               }
-            } catch (e) { console.warn('Stamp add failed', e); }
+            } catch (e) {
+              console.warn('Stamp add failed', e);
+            }
           }
         }
         return true;
@@ -1645,18 +1679,23 @@ const handleRouteChange = async () => {
           currentPageIndex.value = 0;
           await nextTick();
 
-          const hasStamp = Array.isArray(parsedState) && parsedState.some(page =>
-            Array.isArray(page.objects) && page.objects.some(obj =>
-              (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-            )
-          );
+          const hasStamp =
+            Array.isArray(parsedState) &&
+            parsedState.some(
+              (page) =>
+                Array.isArray(page.objects) &&
+                page.objects.some(
+                  (obj) =>
+                    (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
+                )
+            );
 
           if (hasStamp) {
             setTimeout(async () => {
               if (typeof renderAllPages === 'function') await renderAllPages();
             }, 500);
           } else {
-            await new Promise(resolve => {
+            await new Promise((resolve) => {
               setTimeout(async () => {
                 if (typeof renderAllPages === 'function') await renderAllPages();
                 resolve();
@@ -1736,9 +1775,6 @@ const handleRouteChange = async () => {
     return true;
   }
 
-
-
-
   const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-]+)/i);
   if (historyMatch && historyMatch[1]) {
     const instanceId = historyMatch[1];
@@ -1774,7 +1810,6 @@ const handleRouteChange = async () => {
       }
 
       if (typeof editorStore !== 'undefined') {
-
       }
     } catch (error) {
       console.error('Error resetting workspace on back navigation:', error);
@@ -1809,16 +1844,8 @@ onMounted(async () => {
   isCanvasReady.value = true;
   initCanvasEvents();
 
-  try {
-    await fetchVariables();
-  } catch (error) {
-    console.error('Failed to initialize store data:', error);
-  }
-
   const routeHandled = await handleRouteChange();
   window.addEventListener('popstate', handleRouteChange);
-
-
 
   if (canvas.value) {
     canvas.value.on('history:restored', syncPagesFromCanvas);
@@ -2010,7 +2037,7 @@ onUnmounted(() => {
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.floating-panel-anchor>* {
+.floating-panel-anchor > * {
   pointer-events: auto;
 }
 

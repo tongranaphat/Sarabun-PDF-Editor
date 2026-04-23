@@ -308,9 +308,9 @@ export function useEditablePdf() {
           const full =
             hex.length === 3
               ? hex
-                .split('')
-                .map((c) => c + c)
-                .join('')
+                  .split('')
+                  .map((c) => c + c)
+                  .join('')
               : hex;
           return rgb(
             parseInt(full.slice(0, 2), 16) / 255,
@@ -407,12 +407,12 @@ export function useEditablePdf() {
               try {
                 font.widthOfTextAtSize('\u0E01', fontSize);
                 canEncodeThai = true;
-              } catch { }
+              } catch {}
 
               if (!canEncodeThai) {
                 try {
                   font = await loadFont('Sarabun', weight, style);
-                } catch { }
+                } catch {}
               }
             }
 
@@ -459,7 +459,7 @@ export function useEditablePdf() {
                     font: fb,
                     color: textColor
                   });
-                } catch (e2) { }
+                } catch (e2) {}
               }
               currentY -= lineHeight;
             }
@@ -547,7 +547,7 @@ export function useEditablePdf() {
                 rotate: degrees(angleDeg),
                 opacity: obj.opacity ?? 1
               });
-            } catch (err) { }
+            } catch (err) {}
           }
         }
       }

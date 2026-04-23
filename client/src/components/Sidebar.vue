@@ -2,31 +2,34 @@
   <aside class="sidebar-container" @mouseleave="handleMouseLeave">
     <div class="sidebar-rail">
       <div class="rail-items">
-
-        <button @click="handleTabClick('pages')" @mouseenter="handleMouseEnter('pages')" :class="[
-          'rail-btn',
-          { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
-        ]">
+        <button
+          @click="handleTabClick('pages')"
+          @mouseenter="handleMouseEnter('pages')"
+          :class="[
+            'rail-btn',
+            { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
+          ]"
+        >
           <span class="rail-icon icon-page"></span>
           <span class="rail-label">หน้าหนังสือ</span>
         </button>
 
-        <button @click="handleTabClick('data')" @mouseenter="handleMouseEnter('data')" :class="[
-          'rail-btn',
-          { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
-        ]">
+        <button
+          @click="handleTabClick('data')"
+          @mouseenter="handleMouseEnter('data')"
+          :class="[
+            'rail-btn',
+            { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
+          ]"
+        >
           <span class="rail-icon icon-data"></span>
           <span class="rail-label">ข้อมูลเกษียณ</span>
         </button>
-
-
       </div>
     </div>
 
     <div class="sidebar-panel" :class="{ collapsed: !isOpen }">
       <div class="panel-header">
-
-
         <div class="panel-header-title" v-if="activeTab === 'pages'">
           <span class="panel-header-icon icon-pages"></span>
           <h3 class="panel-header-text">จัดการหน้าหนังสือ</h3>
@@ -36,29 +39,41 @@
           <span class="panel-header-icon icon-data-header"></span>
           <h3 class="panel-header-text">ข้อมูลเกษียณ</h3>
         </div>
-
-
       </div>
       <div class="panel-content">
         <div v-if="activeTab === 'pages'" class="tab-pane-pages">
           <div class="pages-list" @mouseleave="clearDragState">
-            <div v-for="(page, index) in pages" :key="page.id" :class="[
-              'page-item-sidebar',
-              {
-                active: isOpen && currentPageIndex === index,
-                disabled: !isCanvasReady,
-                dragging: draggedPageIndex === index,
-                'drag-target-top': dragOverIndex === index && dragPosition === 'top',
-                'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
-              }
-            ]" draggable="true" @dragstart="onPageDragStart($event, index)"
-              @dragover.prevent="onPageDragOver($event, index)" @drop="onPageDrop($event, index)"
-              @dragend="onPageDragEnd" @click="isCanvasReady ? $emit('page-click', index) : null">
+            <div
+              v-for="(page, index) in pages"
+              :key="page.id"
+              :class="[
+                'page-item-sidebar',
+                {
+                  active: isOpen && currentPageIndex === index,
+                  disabled: !isCanvasReady,
+                  dragging: draggedPageIndex === index,
+                  'drag-target-top': dragOverIndex === index && dragPosition === 'top',
+                  'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
+                }
+              ]"
+              draggable="true"
+              @dragstart="onPageDragStart($event, index)"
+              @dragover.prevent="onPageDragOver($event, index)"
+              @drop="onPageDrop($event, index)"
+              @dragend="onPageDragEnd"
+              @click="isCanvasReady ? $emit('page-click', index) : null"
+            >
               <div class="page-entry">
                 <div class="page-thumb">
-                  <img :src="page.background || getDefaultPageImage(index)" :alt="`Page ${index + 1}`" />
-                  <button class="del-page-btn" @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
-                    v-if="pages.length > 1">
+                  <img
+                    :src="page.background || getDefaultPageImage(index)"
+                    :alt="`Page ${index + 1}`"
+                  />
+                  <button
+                    class="del-page-btn"
+                    @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
+                    v-if="pages.length > 1"
+                  >
                     <span class="icon-delete"></span>
                   </button>
                 </div>
@@ -71,21 +86,18 @@
         </div>
 
         <div v-if="activeTab === 'data'" class="tab-pane-data">
-          <div class="data-section">
-            <h4 class="label-small">ข้อความทั่วไป:</h4>
-            <button @click="handleAddCustomText" class="var-btn" draggable="true"
-              @dragstart="onCustomTextDragStart($event)">
-              <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
-              <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
-            </button>
-          </div>
-
           <div class="data-section" v-if="signatories.length > 0">
             <h4 class="label-small">บล็อกลายเซ็น:</h4>
             <div class="var-list">
-              <button v-for="sig in signatories" :key="sig.id" draggable="true"
-                @dragstart="onSignatureDragStart($event, sig)" @click="$emit('add-signature-block', sig)"
-                class="var-btn" :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName">
+              <button
+                v-for="sig in signatories"
+                :key="sig.id"
+                draggable="true"
+                @dragstart="onSignatureDragStart($event, sig)"
+                @click="$emit('add-signature-block', sig)"
+                class="var-btn"
+                :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName"
+              >
                 <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                 <span class="var-btn-text">
                   {{ sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName }}
@@ -94,36 +106,19 @@
             </div>
           </div>
 
-          <div class="divider-line" style="margin-top: 15px"></div>
-
           <div class="data-section">
-            <h4 class="label-small">เลือกชุดข้อมูล:</h4>
-            <div class="var-list">
-              <div v-for="(group, category) in groupedVariables" :key="category" class="var-group">
-                <h5 class="category-header">{{ category }}</h5>
-                <button v-for="v in group" :key="v.key" @click="$emit('add-variable', v.key)" draggable="true"
-                  @dragstart="onDragStart($event, v.key)" class="var-btn">
-                  <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
-                  <span class="var-btn-text">{{ v.label }}</span>
-                </button>
-              </div>
-            </div>
+            <h4 class="label-small">ข้อความทั่วไป:</h4>
+            <button
+              @click="handleAddCustomText"
+              class="var-btn"
+              draggable="true"
+              @dragstart="onCustomTextDragStart($event)"
+            >
+              <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
+              <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
+            </button>
           </div>
-        </div>
-
-
-      </div>
-
-      <div class="panel-footer" v-if="activeTab === 'pages'">
-        <div class="add-page-actions-sidebar">
-          <button class="add-pg-btn" @click="isCanvasReady ? $emit('add-page') : null" :disabled="!isCanvasReady">
-            + เพิ่มหน้าใหม่
-          </button>
-          <input type="file" ref="appendInput" @change="onAppendFileChange" accept="application/pdf"
-            style="display: none" />
-          <button class="add-pg-btn secondary" @click="triggerAppendUpload" :disabled="!isCanvasReady">
-            + นำเข้าหน้าใหม่
-          </button>
+          <div class="divider-line" style="margin-top: 15px"></div>
         </div>
       </div>
     </div>
@@ -134,8 +129,6 @@
 import { ref, onMounted } from 'vue';
 import apiService from '../services/apiService';
 
-
-
 const signatories = ref([]);
 
 onMounted(async () => {
@@ -145,11 +138,6 @@ onMounted(async () => {
     console.error('Failed to load signatories:', error);
   }
 });
-
-const workspaceInput = ref(null);
-const onWorkspaceFileChange = (e) => {
-  emit('import-workspace', e);
-};
 
 const activeTab = ref('pages');
 const isPinned = ref(false);
@@ -176,11 +164,6 @@ const handleTabClick = (tabId) => {
   }
 };
 
-const handleClose = () => {
-  isPinned.value = false;
-  emit('close');
-};
-
 const props = defineProps({
   isOpen: {
     type: Boolean,
@@ -195,18 +178,9 @@ const props = defineProps({
   currentPageIndex: Number
 });
 
-const groupedVariables = ref({
-  ข้อมูลเอกสาร: [
-    { key: 'name', label: 'ชื่อ' },
-    { key: 'date', label: 'วันที่' },
-    { key: 'position', label: 'ตำแหน่ง' }
-  ]
-});
-
 const emit = defineEmits([
   'reset-canvas',
   'import-workspace',
-  'add-variable',
   'add-signature-block',
   'toggle',
   'open',
@@ -214,15 +188,12 @@ const emit = defineEmits([
   'delete-page',
   'page-click',
   'page-drop',
-  'unified-import',
-  'add-page',
-  'import-page'
+  'unified-import'
 ]);
 
 const draggedPageIndex = ref(null);
 const dragOverIndex = ref(null);
 const dragPosition = ref(null);
-const appendInput = ref(null);
 
 const getDefaultPageImage = (index) => {
   return `data:image/svg+xml;base64,${btoa('<svg width="79" height="112" xmlns="http://www.w3.org/2000/svg"><rect width="79" height="112" fill="white"/></svg>')}`;
@@ -257,19 +228,6 @@ const onPageDrop = (e, targetIndex) => {
   emit('page-drop', { sourceIndex, targetIndex, position });
 };
 
-const triggerAppendUpload = () => {
-  if (appendInput.value) appendInput.value.click();
-};
-
-const onAppendFileChange = (e) => {
-  emit('import-page', e);
-};
-
-const onDragStart = (e, key) => {
-  e.dataTransfer.setData('variable', key);
-  e.dataTransfer.effectAllowed = 'copy';
-};
-
 const onContainerDragStart = (e, block) => {
   e.dataTransfer.setData('containerBlock', JSON.stringify(block));
   e.dataTransfer.effectAllowed = 'copy';
@@ -292,8 +250,6 @@ const onCustomTextDragStart = (e) => {
   e.dataTransfer.effectAllowed = 'copy';
 };
 </script>
-
-
 
 <style scoped>
 .sidebar-container {
@@ -649,7 +605,6 @@ const onCustomTextDragStart = (e) => {
   align-items: flex-start;
 }
 
-
 .label-small {
   width: 70px;
   height: 20px;
@@ -697,7 +652,6 @@ const onCustomTextDragStart = (e) => {
   pointer-events: none;
   transition: all 0.2s ease;
 }
-
 
 .icon-delete {
   width: 16px;
@@ -841,18 +795,6 @@ const onCustomTextDragStart = (e) => {
   color: #333;
 }
 
-.connection-status.online {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
-
-.connection-status.offline {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ffcdd2;
-}
-
 .section {
   margin-bottom: 23px;
 }
@@ -867,82 +809,6 @@ const onCustomTextDragStart = (e) => {
   letter-spacing: 0.5px;
 }
 
-.btn-save,
-.btn-new,
-.btn-upload,
-.btn-print {
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
-  font-family: inherit;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-height: 41px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-save.project-save {
-  background: #2196f3;
-  color: white;
-  font-weight: bold;
-}
-
-.btn-save:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.btn-new {
-  width: 298px;
-  height: 46px;
-  margin-top: 17px;
-  background: #ffffff 0% 0% no-repeat padding-box;
-  border: 1px dashed #f65189;
-  border-radius: 5px;
-  opacity: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  text-align: center;
-  font:
-    normal normal bold 20px/28px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #f65189;
-  transition: all 0.2s ease;
-}
-
-.btn-new:hover {
-  background: #fff5f8;
-}
-
-.btn-upload {
-  background: #607d8b;
-  color: white;
-  width: 100%;
-}
-
-.btn-print {
-  background: #673ab7;
-  color: white;
-  width: 100%;
-  font-weight: bold;
-}
-
-.hint {
-  font-size: 14px;
-  color: #666;
-  margin-top: 6px;
-  font-style: italic;
-}
-
 input[type='text'],
 input:not([type]),
 select {
@@ -955,324 +821,10 @@ select {
   background: #fff;
 }
 
-.tab-pane-project {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 15px;
-  width: 100%;
-}
-
-.project-section {
-  width: 298px;
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 20px;
-}
-
-.hint-text {
-  text-align: left;
-  font:
-    normal normal normal 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #a4a4a4;
-  margin: 6px 0 0 0;
-}
-
-.btn-project-save {
-  width: 298px;
-  height: 46px;
-  background: #f65189 0% 0% no-repeat padding-box;
-  border-radius: 6px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.btn-project-save:hover:not(:disabled) {
-  opacity: 0.85;
-  transform: translateY(-1px);
-}
-
-.btn-project-save-text {
-  font:
-    normal normal bold 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #ffffff;
-}
-
 .divider-line {
   width: 298px;
   height: 1px;
   background: #f3f3f3;
   margin-bottom: 25px;
-}
-
-.radio-group-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.radio-card {
-  width: 298px;
-  height: 62px;
-  background: #ffffff 0% 0% no-repeat padding-box;
-  border: 1px solid #e3e3e3;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  padding: 0 15px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-}
-
-.radio-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-}
-
-.radio-card:hover:not(.active) {
-  border-color: #ffd5e3;
-}
-
-.radio-card.active {
-  background: #fff9fb 0% 0% no-repeat padding-box;
-  border: 1px solid #ffd5e3;
-}
-
-.radio-circle {
-  width: 20px;
-  height: 20px;
-  background: #ffffff 0% 0% no-repeat padding-box;
-  border: 1px solid #e3e3e3;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  flex-shrink: 0;
-}
-
-.radio-card.active .radio-circle {
-  border: 1px solid #f65189;
-}
-
-.radio-inner {
-  width: 12px;
-  height: 12px;
-  background: #f65189 0% 0% no-repeat padding-box;
-  border-radius: 50%;
-}
-
-.radio-text-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.radio-title {
-  text-align: left;
-  font:
-    normal normal bold 21px/28px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #000000;
-  line-height: 1;
-  margin-bottom: 2px;
-}
-
-.radio-subtitle {
-  text-align: left;
-  font:
-    normal normal normal 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #4d4d4d;
-  line-height: 1;
-}
-
-.radio-badge {
-  width: 48px;
-  height: 24px;
-  background: #ececec 0% 0% no-repeat padding-box;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font:
-    normal normal bold 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #4d4d4d;
-}
-
-.radio-card.active .radio-badge {
-  background: #ffd5e3 0% 0% no-repeat padding-box;
-  color: #f65189;
-}
-
-.btn-print-outline {
-  width: 298px;
-  height: 46px;
-  background: #ffffff 0% 0% no-repeat padding-box;
-  border: 1px solid #f65189;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-print-outline:hover:not(:disabled) {
-  background: #fff5f8;
-}
-
-.btn-print-outline:disabled {
-  border-color: #ccc;
-  color: #ccc;
-  cursor: not-allowed;
-}
-
-.btn-print-text {
-  font:
-    normal normal bold 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #f65189;
-}
-
-.btn-print-outline:disabled .btn-print-text {
-  color: #ccc;
-}
-
-
-
-.icon-layers-header {
-  background-image: url('../assets/icons/layers-active.png');
-}
-
-.tab-pane-layers {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 15px;
-  width: 100%;
-}
-
-.layers-section {
-  width: 298px;
-  display: flex;
-  flex-direction: column;
-}
-
-.layers-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
-.layer-item-btn {
-  width: 100%;
-  height: 46px;
-  padding: 0 15px;
-  background: #f9f9f9;
-  border: 1px solid #e3e3e3;
-  border-radius: 6px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font:
-    normal normal normal 18px/24px 'TH Sarabun New',
-    'Sarabun',
-    sans-serif;
-  color: #333;
-  display: flex;
-  align-items: center;
-}
-
-.layer-item-btn:hover {
-  background: #f0f0f0;
-}
-
-.layer-item-btn.active {
-  background: #fff5f8;
-  border-color: #f65189;
-  color: #f65189;
-  font-weight: bold;
-}
-
-.danger-zone {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px dashed #ffcdd2;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.danger-zone-title {
-  font-size: 18px;
-  color: #d32f2f;
-  font-weight: bold;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-}
-
-.btn-reset-project {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 16px;
-  background-color: transparent;
-  border: 1.5px solid #f44336;
-  color: #f44336;
-  border-radius: 6px;
-  font-size: 18px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-reset-project:hover {
-  background-color: #f44336;
-  color: #ffffff;
-  box-shadow: 0 4px 8px rgba(244, 67, 54, 0.2);
-}
-
-.btn-reset-project:active {
-  transform: translateY(1px);
-}
-
-.reset-icon {
-  width: 18px;
-  height: 18px;
-  transition: transform 0.3s ease;
-}
-
-.btn-reset-project:hover .reset-icon {
-  transform: rotate(-45deg);
-}
-
-.danger-hint {
-  font-size: 13px;
-  color: #757575;
-  text-align: center;
-  margin: 0;
-  line-height: 1.2;
 }
 </style>

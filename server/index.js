@@ -13,7 +13,6 @@ const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 
 const variableRoutes = require('./routes/variableRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
-const reportInstanceRoutes = require('./routes/reportInstanceRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 
 const signatoryRoutes = require('./routes/signatoryRoutes');
@@ -70,8 +69,6 @@ app.get('/', (req, res) => {
 app.use('/api', healthRoutes);
 app.use('/api', variableRoutes);
 app.use('/api', pdfRoutes);
-app.use('/api', reportInstanceRoutes);
-
 app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
 
@@ -85,7 +82,7 @@ const startServer = async () => {
 
         const PORT = process.env.PORT || 4011;
 
-        server.listen(PORT, "0.0.0.0", () => {
+        server.listen(PORT, '0.0.0.0', () => {
             logger.success(`Server running on port ${PORT}`);
             logger.info(`API Documentation: http://localhost:${PORT}/api`);
         });

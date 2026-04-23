@@ -17,16 +17,18 @@ dist
 dist-ssr
 build
 out
+.next
+.nuxt
 
 # Environment Variables
 .env
-# .env.*
-!.env.example
-!.env.sample
-
-# Server Uploads (User Data)
-server/uploads/*
-!server/uploads/.gitkeep
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env*
+!*.env.example
+!*.env.sample
 
 # Editor directories and files
 .vscode/*
@@ -44,40 +46,33 @@ Thumbs.db
 coverage
 .nyc_output
 
-# Temporary, System & AI Agents
+# AI Agents & Temporary Files
 .temp
 .tmp
 .agents
 .gemini
 .antigravity
 .cursor
+.windsurf
+*.txt
+!README.md
+!ERROR_HANDLING.md
 
-# Scripts & Debug
-*.ps1
-scripts/
-download_*.js
-force_*.js
-create_*.js
-debug-*.js
-test-*.js
-verify-*.js
-find_missing_file.js
-restore_file.js
-cleanup.js
+# Server Uploads
+server/uploads/*
+!server/uploads/.gitkeep
 
-# Custom Logs & Dumps
-git_history.txt
-*_history.txt
-
-# Vite / ESLint Cache
-.eslintcache
-
-# Prisma / Local Database
+# Database
 *.db
 *.sqlite
 *.sqlite3
-prisma/*.db
-prisma/*.sqlite
+server/prisma/*.db
+server/prisma/*.sqlite
 
-# Docker Local Overrides
+# Docker
 docker-compose.override.yml
+
+# OS Files
+Icon?
+ehthumbs.db
+[Dd]esktop.ini

@@ -2,22 +2,36 @@
   <div v-if="hasSelection" class="floating-toolbar">
     <template v-if="isText">
       <div class="toolbar-group font-picker-wrapper" ref="pickerRef">
-        <button class="dropdown-btn font-btn" title="ฟอนต์" @click.stop="togglePicker"
-          :style="{ fontFamily: activeObject?.fontFamily || 'Sarabun' }">
+        <button
+          class="dropdown-btn font-btn"
+          title="ฟอนต์"
+          @click.stop="togglePicker"
+          :style="{ fontFamily: activeObject?.fontFamily || 'Sarabun' }"
+        >
           <span class="font-btn-label">{{ activeFontLabel }}</span>
           <span class="arrow">▾</span>
         </button>
 
         <div v-if="showFontPicker" class="font-dropdown" @click.stop>
-          <input v-model="fontSearch" class="font-search" placeholder="ค้นหาฟอนต์..." @input="filterFonts" />
+          <input
+            v-model="fontSearch"
+            class="font-search"
+            placeholder="ค้นหาฟอนต์..."
+            @input="filterFonts"
+          />
           <div class="font-list" ref="fontListRef">
             <div v-if="filteredThaiFonts.length" class="font-group">
               <div class="font-group-header thai-header">
                 🇹🇭 รองรับภาษาไทย ({{ filteredThaiFonts.length }})
               </div>
-              <div v-for="font in filteredThaiFonts" :key="font.value" class="font-option"
+              <div
+                v-for="font in filteredThaiFonts"
+                :key="font.value"
+                class="font-option"
                 :class="{ active: (activeObject?.fontFamily || 'Sarabun') === font.value }"
-                :style="{ fontFamily: font.value }" @click="selectFont(font.value)">
+                :style="{ fontFamily: font.value }"
+                @click="selectFont(font.value)"
+              >
                 <span class="font-name">{{ font.label }}</span>
                 <span class="font-preview-text">กขค ABC</span>
               </div>
@@ -26,9 +40,14 @@
               <div class="font-group-header latin-header">
                 🔤 ภาษาอังกฤษ ({{ filteredLatinFonts.length }})
               </div>
-              <div v-for="font in filteredLatinFonts" :key="font.value" class="font-option latin-font"
+              <div
+                v-for="font in filteredLatinFonts"
+                :key="font.value"
+                class="font-option latin-font"
                 :class="{ active: (activeObject?.fontFamily || 'Sarabun') === font.value }"
-                :style="{ fontFamily: font.value }" @click="selectFont(font.value)">
+                :style="{ fontFamily: font.value }"
+                @click="selectFont(font.value)"
+              >
                 <span class="font-name">{{ font.label }}</span>
                 <span class="font-preview-text">Aa Bb Cc</span>
               </div>
@@ -40,24 +59,42 @@
       <div class="divider"></div>
 
       <div class="toolbar-group">
-        <input type="number" :value="activeFontSize" @input="handleNumberInput('fontSize', $event)"
-          @blur="handleNumberBlur('fontSize', $event, activeFontSize)" @keydown.enter="$event.target.blur()"
-          @keydown="preventInvalidChars" class="size-input" min="1" step="1" title="ขนาดตัวอักษร" />
+        <input
+          type="number"
+          :value="activeFontSize"
+          @input="handleNumberInput('fontSize', $event)"
+          @blur="handleNumberBlur('fontSize', $event, activeFontSize)"
+          @keydown.enter="$event.target.blur()"
+          @keydown="preventInvalidChars"
+          class="size-input"
+          min="1"
+          step="1"
+          title="ขนาดตัวอักษร"
+        />
       </div>
 
       <div class="divider"></div>
 
       <div class="toolbar-group style-buttons">
-        <button @click="toggleBold" :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontWeight === 'bold' }]"
-          title="ตัวหนา">
+        <button
+          @click="toggleBold"
+          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontWeight === 'bold' }]"
+          title="ตัวหนา"
+        >
           <span style="font-weight: bold">B</span>
         </button>
-        <button @click="toggleItalic"
-          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontStyle === 'italic' }]" title="ตัวเอียง">
+        <button
+          @click="toggleItalic"
+          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontStyle === 'italic' }]"
+          title="ตัวเอียง"
+        >
           <span style="font-style: italic">I</span>
         </button>
-        <button @click="toggleUnderline" :class="['icon-btn', { 'icon-btn-selected': activeObject?.underline }]"
-          title="ขีดเส้นใต้">
+        <button
+          @click="toggleUnderline"
+          :class="['icon-btn', { 'icon-btn-selected': activeObject?.underline }]"
+          title="ขีดเส้นใต้"
+        >
           <span style="text-decoration: underline">U</span>
         </button>
       </div>
@@ -65,20 +102,29 @@
       <div class="divider"></div>
 
       <div class="toolbar-group segmented-control">
-        <button @click="setAlignment('left')" :class="['icon-btn', { active: activeTextAlign === 'left' }]"
-          title="จัดซ้าย">
+        <button
+          @click="setAlignment('left')"
+          :class="['icon-btn', { active: activeTextAlign === 'left' }]"
+          title="จัดซ้าย"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm0 5h12v2H3V9zm0 5h18v2H3v-2zm0 5h12v2H3v-2z" />
           </svg>
         </button>
-        <button @click="setAlignment('center')" :class="['icon-btn', { active: activeTextAlign === 'center' }]"
-          title="จัดกลาง">
+        <button
+          @click="setAlignment('center')"
+          :class="['icon-btn', { active: activeTextAlign === 'center' }]"
+          title="จัดกลาง"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm4 5h10v2H7V9zm-4 5h18v2H3v-2zm4 5h10v2H7v-2z" />
           </svg>
         </button>
-        <button @click="setAlignment('right')" :class="['icon-btn', { active: activeTextAlign === 'right' }]"
-          title="จัดขวา">
+        <button
+          @click="setAlignment('right')"
+          :class="['icon-btn', { active: activeTextAlign === 'right' }]"
+          title="จัดขวา"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm6 5h12v2H9V9zm-6 5h18v2H3v-2zm6 5h12v2H9v-2z" />
           </svg>
@@ -91,8 +137,13 @@
 
       <div class="toolbar-group">
         <div class="color-wrapper" title="เลือกสี">
-          <input type="color" :value="activeFillColor" @input="updateProp('fill', $event.target.value, true)"
-            @change="updateProp('fill', $event.target.value, true)" class="color-input" />
+          <input
+            type="color"
+            :value="activeFillColor"
+            @input="updateProp('fill', $event.target.value, true)"
+            @change="updateProp('fill', $event.target.value, true)"
+            class="color-input"
+          />
           <span class="color-preview" :style="{ backgroundColor: activeFillColor }"></span>
         </div>
       </div>
@@ -100,36 +151,64 @@
 
     <div class="divider" v-if="isText || isShape"></div>
 
-    <div class="toolbar-group relative">
-      <button @click.stop="
-        showOpacity = !showOpacity;
-      showSpacing = false;
-      showLayers = false;
-      showFontPicker = false;
-      " class="dropdown-btn" title="ความทึบ">
-        <span :class="showOpacity ? 'text-active' : 'text-muted'">{{ Math.round(activeOpacity * 100) }}%</span>
+    <div v-if="selectionCategory !== 'mixed' && !isSignature" class="toolbar-group relative">
+      <button
+        @click.stop="
+          showOpacity = !showOpacity;
+          showSpacing = false;
+          showFontPicker = false;
+        "
+        class="dropdown-btn"
+        title="ความทึบ"
+      >
+        <span :class="showOpacity ? 'text-active' : 'text-muted'"
+          >{{ Math.round(activeOpacity * 100) }}%</span
+        >
         <span class="arrow">▾</span>
       </button>
 
       <div v-if="showOpacity" class="dropdown-menu" @click.stop>
         <div class="dropdown-header">ความทึบ</div>
-        <button v-for="val in [1, 0.9, 0.75, 0.5, 0.25]" :key="val" @click="setOpacity(val)"
-          :class="['dropdown-item', { active: Math.abs(activeOpacity - val) < 0.01 }]">
+        <button
+          v-for="val in [1, 0.9, 0.75, 0.5, 0.25]"
+          :key="val"
+          @click="setOpacity(val)"
+          :class="['dropdown-item', { active: Math.abs(activeOpacity - val) < 0.01 }]"
+        >
           {{ val * 100 }}%
         </button>
       </div>
+    </div>
+
+    <div v-if="isSignature" class="toolbar-group scale-group">
+      <span class="scale-label">ขนาด:</span>
+      <input
+        type="number"
+        :value="activeScale"
+        @input="handleScaleInput"
+        @blur="handleScaleBlur"
+        @keydown.enter="$event.target.blur()"
+        @keydown="preventInvalidChars"
+        class="size-input scale-input"
+        min="1"
+        step="1"
+      />
+      <span class="scale-unit"></span>
     </div>
 
     <template v-if="isText">
       <div class="divider"></div>
 
       <div class="toolbar-group relative">
-        <button @click.stop="
-          showSpacing = !showSpacing;
-        showOpacity = false;
-        showLayers = false;
-        showFontPicker = false;
-        " class="dropdown-btn" title="ระยะห่างตัวอักษรและบรรทัด">
+        <button
+          @click.stop="
+            showSpacing = !showSpacing;
+            showOpacity = false;
+            showFontPicker = false;
+          "
+          class="dropdown-btn"
+          title="ระยะห่างตัวอักษรและบรรทัด"
+        >
           <span :class="showSpacing ? 'text-active' : 'text-muted'">ระยะห่าง</span>
           <span class="arrow">▾</span>
         </button>
@@ -137,62 +216,46 @@
         <div v-if="showSpacing" class="dropdown-menu spacing-menu" @click.stop>
           <div class="spacing-row">
             <label>ระยะระหว่างตัวอักษร</label>
-            <input type="number" class="size-input" :value="Math.round(activeCharSpacing / 10)"
+            <input
+              type="number"
+              class="size-input"
+              :value="Math.round(activeCharSpacing / 10)"
               @input="handleNumberInput('charSpacing', $event, 10)"
               @blur="handleNumberBlur('charSpacing', $event, activeCharSpacing, 10)"
-              @keydown.enter="$event.target.blur()" step="1" />
+              @keydown.enter="$event.target.blur()"
+              step="1"
+            />
           </div>
           <div class="spacing-row">
             <label>ระยะระหว่างบรรทัด</label>
-            <input type="number" class="size-input" :value="activeLineHeight"
+            <input
+              type="number"
+              class="size-input"
+              :value="activeLineHeight"
               @input="handleNumberInput('lineHeight', $event)"
-              @blur="handleNumberBlur('lineHeight', $event, activeLineHeight)" @keydown.enter="$event.target.blur()"
-              step="0.1" />
+              @blur="handleNumberBlur('lineHeight', $event, activeLineHeight)"
+              @keydown.enter="$event.target.blur()"
+              step="0.1"
+            />
           </div>
         </div>
       </div>
     </template>
 
-    <div class="divider"></div>
-
-    <div class="toolbar-group relative">
-      <button @click.stop="
-        showLayers = !showLayers;
-      showSpacing = false;
-      showOpacity = false;
-      showFontPicker = false;
-      " class="dropdown-btn" title="เลเยอร์">
-        <span :class="showLayers ? 'text-active' : 'text-muted'">เลเยอร์</span>
-        <span class="arrow">▾</span>
-      </button>
-
-      <div v-if="showLayers" class="dropdown-menu layer-popup" @click.stop>
-        <button @click="bringForward" class="dropdown-item align-left">
-          <img src="../assets/icons/layer-up.png" alt="ย้ายขึ้นไปหนึ่งชั้น" class="layer-icon" />
-          ย้ายขึ้นไปหนึ่งชั้น
-        </button>
-        <button @click="bringToFront" class="dropdown-item align-left">
-          <img src="../assets/icons/layer-top.png" alt="ย้ายขึ้นไปบนสุด" class="layer-icon" />
-          ย้ายขึ้นไปบนสุด
-        </button>
-        <button @click="sendBackwards" class="dropdown-item align-left">
-          <img src="../assets/icons/layer-down.png" alt="ย้ายลงไปหนึ่งชั้น" class="layer-icon" />
-          ย้ายลงไปหนึ่งชั้น
-        </button>
-        <button @click="sendToBack" class="dropdown-item align-left">
-          <img src="../assets/icons/layer-bottom.png" alt="ย้ายลงไปล่างสุด" class="layer-icon" />
-          ย้ายลงไปล่างสุด
-        </button>
-      </div>
-    </div>
-
-    <div class="divider"></div>
+    <div class="divider" v-if="isText || isSignature"></div>
 
     <div class="toolbar-group">
       <button @click="deleteObject" class="delete-btn" title="ลบวัตถุ">
-        <svg class="delete-icon" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
+        <svg
+          class="delete-icon"
+          width="16"
+          height="16"
+          viewBox="0 -960 960 960"
+          fill="currentColor"
+        >
           <path
-            d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+            d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
+          />
         </svg>
         <span>ลบ</span>
       </button>
@@ -202,10 +265,9 @@
 
 <script setup>
 import { ref, shallowRef, onMounted, onUnmounted, triggerRef, computed, watch, toRaw } from 'vue';
-import { fabric } from 'fabric';
 
 const props = defineProps({
-  canvas: { type: Object, default: null },
+  canvas: { type: Object, default: null }
 });
 
 const emit = defineEmits(['add-signature-block']);
@@ -218,49 +280,8 @@ const showFontPicker = ref(false);
 const fontSearch = ref('');
 const pickerRef = ref(null);
 const fontListRef = ref(null);
-const showLayerControls = ref(false);
 const showOpacity = ref(false);
 const showSpacing = ref(false);
-const showLayers = ref(false);
-
-const executeLayerAction = (actionName) => {
-  if (!props.canvas) return;
-  const canvas = toRaw(props.canvas);
-  const rawActive = canvas.getActiveObject();
-  if (!rawActive) return;
-  const active = toRaw(rawActive);
-
-  if (active.isEditing) {
-    active.exitEditing();
-  }
-
-  const objects = canvas.getObjects();
-  const bgCount = objects.filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image').length;
-  const currentIndex = objects.indexOf(active);
-
-  if (actionName === 'forward') {
-    canvas.bringForward(active);
-  } else if (actionName === 'front') {
-    canvas.bringToFront(active);
-  } else if (actionName === 'backward') {
-    if (currentIndex > bgCount) {
-      canvas.sendBackwards(active);
-    }
-  } else if (actionName === 'back') {
-    if (currentIndex > bgCount) {
-      canvas.moveTo(active, bgCount);
-    }
-  }
-
-  canvas.requestRenderAll();
-  canvas.fire('object:modified', { target: active });
-  showLayers.value = false;
-};
-
-const bringForward = () => executeLayerAction('forward');
-const bringToFront = () => executeLayerAction('front');
-const sendBackwards = () => executeLayerAction('backward');
-const sendToBack = () => executeLayerAction('back');
 
 const thaiFonts = [
   { label: 'Sarabun', value: 'Sarabun' },
@@ -342,10 +363,8 @@ const togglePicker = () => {
   showFontPicker.value = !showFontPicker.value;
   showOpacity.value = false;
   showSpacing.value = false;
-  showLayers.value = false;
 
   if (showFontPicker.value) {
-    showLayerControls.value = false;
     fontSearch.value = '';
     setTimeout(() => {
       const activeEl = fontListRef.value?.querySelector('.active');
@@ -361,20 +380,13 @@ const handleClickOutside = (e) => {
     showFontPicker.value = false;
   }
   if (!e.target.closest('.dropdown-btn') && !e.target.closest('.dropdown-menu')) {
-    showLayerControls.value = false;
     showOpacity.value = false;
     showSpacing.value = false;
   }
 
   const layerPopup = document.querySelector('.layer-popup');
   const layerBtn = document.querySelector('button[title="เลเยอร์"]');
-  if (
-    showLayers.value &&
-    layerPopup &&
-    !layerPopup.contains(e.target) &&
-    (!layerBtn || !layerBtn.contains(e.target))
-  ) {
-    showLayers.value = false;
+  if (layerPopup && !layerPopup.contains(e.target) && (!layerBtn || !layerBtn.contains(e.target))) {
   }
 };
 
@@ -399,23 +411,56 @@ const selectFont = (fontFamily) => {
   showFontPicker.value = false;
 };
 
-const getTarget = () => {
+const getPropertyTarget = () => {
   renderKey.value;
-  return activeObject.value;
+  const target = activeObject.value;
+  if (target && target.type === 'activeSelection') {
+    return target.getObjects()[0];
+  }
+  return target;
 };
 
-const isText = computed(() => {
-  const target = getTarget();
-  return target && ['i-text', 'textbox', 'text'].includes(target.type);
+const getObjectCategory = (obj) => {
+  if (!obj) return 'none';
+  if (['i-text', 'textbox', 'text'].includes(obj.type)) return 'text';
+  if (obj.id === 'page-bg' || obj.id === 'page-bg-image') return 'none';
+  return 'block';
+};
+
+const selectionCategory = computed(() => {
+  const target = activeObject.value;
+  if (!target) return 'none';
+
+  if (target.type === 'activeSelection') {
+    const objects = target.getObjects();
+    const categories = objects.map(getObjectCategory).filter((c) => c !== 'none');
+    const uniqueCategories = [...new Set(categories)];
+    if (uniqueCategories.length === 1) return uniqueCategories[0];
+    return 'mixed';
+  }
+
+  return getObjectCategory(target);
 });
 
+const isText = computed(() => selectionCategory.value === 'text');
+
 const isShape = computed(() => {
-  const target = getTarget();
-  return target && ['rect', 'circle', 'triangle', 'path', 'line', 'polygon'].includes(target.type);
+  const target = getPropertyTarget();
+  return (
+    !isMultiple.value &&
+    target &&
+    ['rect', 'circle', 'triangle', 'path', 'line', 'polygon'].includes(target.type)
+  );
+});
+
+const isSignature = computed(() => selectionCategory.value === 'block');
+
+const isMultiple = computed(() => {
+  return activeObject.value?.type === 'activeSelection';
 });
 
 const activeFontLabel = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   if (!target) return 'Sarabun';
   const family = target.fontFamily || 'Sarabun';
   const found = [...thaiFonts, ...latinFonts].find((f) => f.value === family);
@@ -423,33 +468,39 @@ const activeFontLabel = computed(() => {
 });
 
 const activeFontSize = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target ? Math.round(target.fontSize || 16) : 16;
 });
 
 const activeTextAlign = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target ? target.textAlign || 'left' : 'left';
 });
 
 const activeFillColor = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target ? getHexColor(target.fill || '#000000') : '#000000';
 });
 
 const activeOpacity = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target && target.opacity !== undefined ? target.opacity : 1;
 });
 
 const activeCharSpacing = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target ? target.charSpacing || 0 : 0;
 });
 
 const activeLineHeight = computed(() => {
-  const target = getTarget();
+  const target = getPropertyTarget();
   return target ? target.lineHeight || 1.16 : 1.16;
+});
+
+const activeScale = computed(() => {
+  const target = getPropertyTarget();
+  if (!target) return 100;
+  return Math.round((target.scaleX || 1) * 100);
 });
 
 const getHexColor = (color) => {
@@ -473,6 +524,35 @@ const updateProp = (prop, value, triggerRender = true) => {
     props.canvas.requestRenderAll();
     props.canvas.fire('object:modified', { target: activeObject.value });
     triggerRef(activeObject);
+  }
+};
+
+const handleScaleInput = (event) => {
+  const val = event.target.value;
+  if (val === '') return;
+
+  const num = parseFloat(val);
+  if (!isNaN(num)) {
+    const scale = num / 100;
+    if (activeObject.value) {
+      activeObject.value.set({
+        scaleX: scale,
+        scaleY: scale
+      });
+      activeObject.value.setCoords();
+      props.canvas.requestRenderAll();
+      triggerRef(activeObject);
+    }
+  }
+};
+
+const handleScaleBlur = (event) => {
+  const val = event.target.value;
+  if (val === '' || isNaN(parseFloat(val))) {
+    event.target.value = activeScale.value;
+  } else {
+    handleScaleInput(event);
+    saveHistory();
   }
 };
 
@@ -534,10 +614,20 @@ const setOpacity = (val) => {
 
 const deleteObject = () => {
   if (!activeObject.value || !props.canvas) return;
-  props.canvas.remove(activeObject.value);
-  props.canvas.requestRenderAll();
-  activeObject.value = null;
-  hasSelection.value = false;
+
+  const activeObjects = props.canvas.getActiveObjects();
+  if (activeObjects.length > 0) {
+    activeObjects.forEach((obj) => {
+      props.canvas.remove(obj);
+    });
+    props.canvas.discardActiveObject().requestRenderAll();
+    activeObject.value = null;
+    hasSelection.value = false;
+
+    if (typeof props.canvas.fire === 'function') {
+      props.canvas.fire('object:modified');
+    }
+  }
 };
 
 const updateSelection = () => {
@@ -556,7 +646,6 @@ const updateSelection = () => {
     showSpacing.value = false;
     showOpacity.value = false;
     showFontPicker.value = false;
-    showLayers.value = false;
   }
 
   activeObject.value = active;
@@ -621,6 +710,32 @@ onUnmounted(() => {
   color: #333;
   white-space: nowrap;
   flex-wrap: nowrap;
+}
+
+.scale-group {
+  margin: 0 4px;
+}
+
+.scale-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.scale-input {
+  width: 50px !important;
+  height: 32px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+  margin: 0 4px !important;
+}
+
+.scale-unit {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
 }
 
 .toolbar-group {
@@ -1006,10 +1121,6 @@ onUnmounted(() => {
   color: #f65189;
 }
 
-.layer-popup {
-  width: 170px;
-}
-
 .dropdown-item.align-left {
   display: flex;
   align-items: center;
@@ -1026,11 +1137,5 @@ onUnmounted(() => {
 .text-active {
   color: #333;
   transition: color 0.2s ease;
-}
-
-.layer-icon {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
 }
 </style>

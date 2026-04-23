@@ -505,10 +505,10 @@ const uploadPdf = async (req, res) => {
         });
 
         if (existingPdf) {
-            return res.status(200).json({ 
-                ...existingPdf, 
-                id: existingPdf.OriginalFileId, 
-                filepath: existingPdf.FilePath 
+            return res.status(200).json({
+                ...existingPdf,
+                id: existingPdf.OriginalFileId,
+                filepath: existingPdf.FilePath
             });
         }
 
@@ -602,12 +602,9 @@ const savePdfState = async (req, res) => {
         const pdf = await prisma.pdfCache.findUnique({ where: { OriginalFileId } });
         if (!pdf) return res.status(404).json({ error: 'PDF not found' });
 
-        let newEditedPath = pdf.EditedFilePath;
-
-        if (!pdf.EditedFile || !newEditedPath) {
-            const editedFileName = `edited_${Date.now()}_${pdf.FileName}`;
-            newEditedPath = `/uploads/edited/cache/${editedFileName}`;
-        }
+        const timestamp = Date.now();
+        const editedFileName = `edited_${timestamp}_${pdf.FileName}`;
+        const newEditedPath = `/uploads/edited/cache/${editedFileName}`;
 
         const absoluteEditedPath = path.join(__dirname, '..', newEditedPath.replace(/^\//, ''));
         const editedDir = path.dirname(absoluteEditedPath);
@@ -620,6 +617,35 @@ const savePdfState = async (req, res) => {
             const absoluteTemp = path.join(__dirname, '..', `uploads/temp/temp_${OriginalFileId}.pdf`);
             if (fs.existsSync(absoluteTemp)) {
                 fs.copyFileSync(absoluteTemp, absoluteEditedPath);
+            }
+        }
+
+        const isLocalPath =
+            pdf.OriginalUrlorPath &&
+            (pdf.OriginalUrlorPath.includes(':') || pdf.OriginalUrlorPath.startsWith('\\\\')) &&
+            !pdf.OriginalUrlorPath.toLowerCase().startsWith('http');
+
+        if (isLocalPath) {
+            try {
+                const localDir = path.dirname(pdf.OriginalUrlorPath);
+
+                const localEditedPath = path.join(localDir, `edited_${pdf.FileName}`);
+                fs.copyFileSync(absoluteEditedPath, localEditedPath);
+                console.log(`[savePdfState] Synced latest version to local folder: ${localEditedPath}`);
+            } catch (localErr) {
+                console.warn(`[savePdfState] Could not sync to local folder (Permissions?): ${localErr.message}`);
+            }
+        }
+
+        if (pdf.EditedFile && pdf.EditedFilePath) {
+            const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
+            if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
+                try {
+                    fs.unlinkSync(oldPath);
+                    console.log(`[savePdfState] Cleaned up old cache file: ${oldPath}`);
+                } catch (e) {
+                    console.warn(`[savePdfState] Failed to delete old cache file: ${e.message}`);
+                }
             }
         }
 
@@ -715,17 +741,38 @@ const saveGeneratedPdfState = async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์ PDF ที่ส่งมา' });
         const pdf = await prisma.pdfCache.findUnique({ where: { OriginalFileId } });
         if (!pdf) return res.status(404).json({ error: 'ไม่พบโปรเจกต์ในระบบ' });
-        const editedFileName = `edited_${req.file.filename}`;
+        const timestamp = Date.now();
+        const editedFileName = `edited_${timestamp}_${pdf.FileName}`;
         const editedDir = path.join(__dirname, '../uploads/edited/cache');
         if (!fs.existsSync(editedDir)) fs.mkdirSync(editedDir, { recursive: true });
         const newEditedPath = `/uploads/edited/cache/${editedFileName}`;
         const absoluteNewEdited = path.join(editedDir, editedFileName);
+
         fs.copyFileSync(req.file.path, absoluteNewEdited);
         fs.unlinkSync(req.file.path);
+
+        const isLocalPath =
+            pdf.OriginalUrlorPath &&
+            (pdf.OriginalUrlorPath.includes(':') || pdf.OriginalUrlorPath.startsWith('\\\\')) &&
+            !pdf.OriginalUrlorPath.toLowerCase().startsWith('http');
+
+        if (isLocalPath) {
+            try {
+                const localDir = path.dirname(pdf.OriginalUrlorPath);
+                const localEditedPath = path.join(localDir, `edited_${pdf.FileName}`);
+                fs.copyFileSync(absoluteNewEdited, localEditedPath);
+                console.log(`[saveGeneratedPdfState] Synced to local folder: ${localEditedPath}`);
+            } catch (e) {
+                console.warn(`[saveGeneratedPdfState] Failed to sync to local folder: ${e.message}`);
+            }
+        }
+
         if (pdf.EditedFile && pdf.EditedFilePath) {
-            const oldPath = path.join(__dirname, '..', pdf.EditedFilePath);
-            if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath)) {
-                fs.unlinkSync(oldPath);
+            const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
+            if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
+                try {
+                    fs.unlinkSync(oldPath);
+                } catch (e) {}
             }
         }
         const updatedPdf = await prisma.pdfCache.update({
@@ -739,7 +786,7 @@ const saveGeneratedPdfState = async (req, res) => {
         res.status(200).json(updatedPdf);
     } catch (error) {
         console.error('Save Generated PDF Error:', error);
-        res.status(500).json({ error: 'บันทึกโปรเจกต์พร้อมไฟล์ PDF ไม่สำเร็จ' });
+        res.status(500).json({ error: 'บันทึกไฟล์ไม่สำเร็จ' });
     }
 };
 
@@ -802,7 +849,10 @@ const getStampMetadata = async (req, res) => {
 
         const targetDate = stampConfig.createdAt;
         const thDate = targetDate.toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' });
-        const thTime = targetDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '.') + ' น.';
+        const thTime =
+            targetDate
+                .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })
+                .replace(':', '.') + ' น.';
 
         res.json({
             schoolName: stampConfig.schoolName,

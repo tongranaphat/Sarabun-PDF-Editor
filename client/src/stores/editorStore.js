@@ -15,7 +15,6 @@ const getMachineId = () => {
 };
 
 export const useEditorStore = defineStore('editor', () => {
-  const variables = ref([]);
   const pages = ref([{ id: 0, background: null, objects: [] }]);
   const currentPageIndex = ref(0);
 
@@ -23,34 +22,6 @@ export const useEditorStore = defineStore('editor', () => {
   const currentReportId = ref(null);
   const documentTitle = ref('');
   const isSidebarOpen = ref(false);
-
-  const groupedVariables = computed(() => {
-    return variables.value.reduce((acc, curr) => {
-      const cat = curr.category || 'General';
-      (acc[cat] = acc[cat] || []).push(curr);
-      return acc;
-    }, {});
-  });
-
-  const fetchVariables = async () => {
-    try {
-      const data = await apiService.getVariables();
-      variables.value = data;
-    } catch (e) {
-      console.error('Failed to load vars', e);
-      variables.value = [
-        { key: 'school_name', label: 'ชื่อโรงเรียน', scope: 'GLOBAL', category: 'Student Info' },
-        { key: 'school_year', label: 'ปีการศึกษา', scope: 'GLOBAL', category: 'Student Info' },
-        { key: 'student_name', label: 'ชื่อนักเรียน', scope: 'GLOBAL', category: 'Student Info' }
-      ];
-    }
-  };
-
-  const addBlankPage = () => {
-    const insertIndex = currentPageIndex.value + 1;
-    pages.value.splice(insertIndex, 0, { id: Date.now(), background: null, objects: [] });
-    currentPageIndex.value = insertIndex;
-  };
 
   const deletePage = (index) => {
     pages.value.splice(index, 1);
@@ -68,18 +39,12 @@ export const useEditorStore = defineStore('editor', () => {
   };
 
   return {
-    variables,
     pages,
     currentPageIndex,
     currentDocumentId,
     currentReportId,
     documentTitle,
     isSidebarOpen,
-
-    groupedVariables,
-
-    fetchVariables,
-    addBlankPage,
     deletePage,
     resetState,
     getMachineId

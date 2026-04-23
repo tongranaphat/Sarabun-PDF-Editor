@@ -57,61 +57,6 @@ export const apiService = {
     return response.data;
   },
 
-
-
-
-  async getReports() {
-    const response = await api.get('/reports');
-    return response.data;
-  },
-
-  async getReportById(id) {
-    const response = await api.get(`/reports/${id}`);
-    return response.data;
-  },
-
-  async createReport(reportData) {
-    const response = await api.post('/reports', reportData);
-    return response.data;
-  },
-
-  async deleteReport(id) {
-    const response = await api.delete(`/reports/${id}`);
-    return response.data;
-  },
-
-  async saveReport(reportData) {
-    const response = await api.post('/save-report', reportData);
-    return response.data;
-  },
-
-  async createReportInstance(reportInstanceData) {
-    const response = await api.post('/report-instances', reportInstanceData);
-    return response.data;
-  },
-
-  async getReportInstances(userId = null) {
-    const params = userId ? { userId } : {};
-    const response = await api.get('/report-instances', { params });
-    return response.data;
-  },
-
-  async getReportInstanceById(id) {
-    const response = await api.get(`/report-instances/${id}`);
-    return response.data;
-  },
-
-  async updateReportInstance(id, reportInstanceData) {
-    const response = await api.put(`/report-instances/${id}`, reportInstanceData);
-    return response.data;
-  },
-
-  async deleteReportInstance(id) {
-    const response = await api.delete(`/report-instances/${id}`);
-    return response.data;
-  },
-
-
   async importPdfFromUrl(url) {
     const response = await api.post('/pdf/import-url', { url });
     return response.data;

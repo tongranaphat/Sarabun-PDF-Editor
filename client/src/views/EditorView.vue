@@ -4,7 +4,7 @@
       @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @save-report="handleSaveProject"
       @generate-pdf="handleExport" @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
 
-    <Sidebar :isOpen="isSidebarOpen" :connectionStatus="connectionStatus" :isCanvasReady="isCanvasReady" :pages="pages"
+    <Sidebar :isOpen="isSidebarOpen" :isCanvasReady="isCanvasReady" :pages="pages"
       :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
       @close="isSidebarOpen = false" @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper"
       @delete-page="deletePage" @page-click="scrollToPage" @page-drop="handlePageDrop"
@@ -64,22 +64,19 @@ const currentPdfId = computed(() => {
   const parts = window.location.pathname.split('/');
   return parts[parts.length - 1];
 });
-const pdfUrlToRender = ref('');
+
+const canvasBaseDimensions = ref({
+  width: CANVAS_CONSTANTS.PAGE_WIDTH,
+  height: CANVAS_CONSTANTS.PAGE_HEIGHT
+});
+const isGenerating = ref(false);
+const pdfQuality = ref(2);
+let isRendering = false;
 
 const PAGE_WIDTH_CONST = CANVAS_CONSTANTS.PAGE_WIDTH;
 const PAGE_HEIGHT_CONST = CANVAS_CONSTANTS.PAGE_HEIGHT;
 
 let isCanvasReady = ref(false);
-const canvasBaseDimensions = ref({
-  width: CANVAS_CONSTANTS.PAGE_WIDTH,
-  height: CANVAS_CONSTANTS.PAGE_HEIGHT
-});
-const connectionStatus = ref('offline');
-const isGenerating = ref(false);
-const pdfQuality = ref(2);
-const pdfMode = ref('flatten');
-const pdfUrl = ref(null);
-let isRendering = false;
 
 const exportOverlay = ref({
   visible: false,
@@ -102,6 +99,7 @@ const hideExportOverlay = () => {
 let _wheelHandler = null;
 let _scrollHandler = null;
 let _keydownHandler = null;
+
 
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value;
@@ -244,7 +242,6 @@ const {
   zoomOut,
   fitToScreen,
   removeSelectedObject,
-  onDrop: onDropCore,
   setHistoryLock,
   saveHistory,
   resetHistory,
@@ -271,16 +268,15 @@ const {
   currentPageIndex,
   isSidebarOpen,
   isPagesSidebarOpen,
+  currentFileHandle,
 
   saveReport,
   resetCanvas,
-  handleImportWorkspace,
   getDefaultPageImage,
   cleanFabricObject,
   preparePagesForSave,
   sanitizePagesData,
   handleUnifiedImport,
-  ensureFileHandle,
   processPdfToImages,
   saveFileWithFallback,
   setDocumentCallbacks
@@ -288,14 +284,12 @@ const {
 
 if (setHistoryContext) setHistoryContext(pages, currentPageIndex);
 
-const originalTextBackup = ref(null);
 
 const { initCanvasEvents } = useCanvasEvents(
   canvas,
   pages,
   currentPageIndex,
-  saveHistory,
-  setHistoryLock
+  saveHistory
 );
 const { generateHybridPdfBlob, captureCanvasPageSafe } = useEditablePdf();
 
@@ -449,10 +443,12 @@ const handleSaveProject = async () => {
           const objPageIndex = getPageIndexFromTop(center.y);
           const isWrongPage = objPageIndex !== i;
           const isBackground = obj.id === 'page-bg-image' || obj.id === 'page-bg';
+          const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
           const isOverlay = OVERLAY_TYPES.includes(obj.type) && !isBackground;
 
           let shouldHide = false;
-          if (pdfMode.value === 'flatten') shouldHide = isWrongPage;
+          const pdfMode = 'flatten';
+          if (pdfMode === 'flatten') shouldHide = isWrongPage;
           else shouldHide = isWrongPage || isOverlay;
 
           if (shouldHide && obj.visible) {
@@ -537,7 +533,7 @@ const handleSaveProject = async () => {
         variableMap,
         null,
         'report',
-        pdfMode.value
+        'flatten'
       );
 
       updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไปยังเซิร์ฟเวอร์...');
@@ -574,6 +570,7 @@ const handleSaveProject = async () => {
         canvas.value.getObjects().forEach((obj) => {
           if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
             obj.set({ selectable: true, evented: true, visible: true });
+            const TEXT_TYPES = ['textbox', 'text', 'i-text'];
             if (TEXT_TYPES.includes(obj.type)) obj.set('editable', true);
           }
         });
@@ -618,11 +615,6 @@ const handleExport = async () => {
       }
     } catch (error) {
       console.warn('Failed to fetch live variables, using sidebar defaults:', error);
-      if (variables.value) {
-        variables.value.forEach((v) => {
-          if (v.key) variableMap[v.key] = v.value || `{{${v.key}}}`;
-        });
-      }
     }
 
     const canvasImages = [];
@@ -654,7 +646,8 @@ const handleExport = async () => {
           const isOverlay = OVERLAY_TYPES.includes(obj.type) && !isBackground;
 
           let shouldHide = false;
-          if (pdfMode.value === 'flatten') {
+          const pdfMode = 'flatten';
+          if (pdfMode === 'flatten') {
             shouldHide = isWrongPage;
           } else {
             shouldHide = isWrongPage || isOverlay;
@@ -745,7 +738,7 @@ const handleExport = async () => {
         variableMap,
         null,
         'report',
-        pdfMode.value
+        'flatten'
       );
 
       hideExportOverlay();
@@ -1399,12 +1392,10 @@ const handleRouteChange = async () => {
       const newPdfId = data.OriginalFileId || data.id || data.fileId;
 
       if (newPdfId) {
-        console.log('[STAMP-DEBUG] URL import success, newPdfId:', newPdfId);
         window.history.replaceState({}, '', `/pdf/${newPdfId}`);
         activePdfId = newPdfId;
 
         const workspaceData = await apiService.prepareWorkspace(newPdfId);
-        console.log('[STAMP-DEBUG] workspaceData.editState:', !!workspaceData.editState);
 
         if (workspaceData.editState) {
           let parsedState = workspaceData.editState;
@@ -1423,7 +1414,6 @@ const handleRouteChange = async () => {
                     (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
                 )
             );
-          console.log('[STAMP-DEBUG] editState has stamp:', hasStamp);
 
           await new Promise((r) =>
             setTimeout(async () => {
@@ -1434,14 +1424,8 @@ const handleRouteChange = async () => {
 
           if (!hasStamp) {
             try {
-              console.log('[STAMP-DEBUG] Fetching stamp metadata for:', newPdfId);
-              const stampMeta = await apiService.getStampMetadata(newPdfId);
-              console.log('[STAMP-DEBUG] Got stamp metadata:', stampMeta);
-              console.log('[STAMP-DEBUG] addStampBlockToCanvas is:', typeof addStampBlockToCanvas);
-              console.log('[STAMP-DEBUG] canvas.value is:', !!canvas.value);
               if (addStampBlockToCanvas) {
                 addStampBlockToCanvas(stampMeta);
-                console.log('[STAMP-DEBUG] Stamp block added to canvas!');
                 setTimeout(async () => {
                   try {
                     saveCurrentPageState();
@@ -1450,18 +1434,16 @@ const handleRouteChange = async () => {
                     fd.append('OriginalFileId', newPdfId);
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
-                    console.log('[STAMP-DEBUG] Stamp auto-saved!');
                   } catch (err) {
-                    console.error('[STAMP-DEBUG] Auto-save stamp failed', err);
+                    console.error('Auto-save stamp failed', err);
                   }
                 }, 500);
               }
             } catch (e) {
-              console.warn('[STAMP-DEBUG] Stamp add failed', e);
+              console.warn('Stamp add failed', e);
             }
           }
         } else {
-          console.log('[STAMP-DEBUG] No editState, rendering PDF from scratch');
           const blobData = await apiService.downloadBlob(workspaceData.tempPath);
           const downloadedFile = new File([blobData], 'url_import.pdf', {
             type: 'application/pdf'
@@ -1469,7 +1451,6 @@ const handleRouteChange = async () => {
 
           await resetCanvasWrapper();
           const images = await processPdfToImages(downloadedFile);
-          console.log('[STAMP-DEBUG] Processed', images.length, 'pages');
           if (images.length > 0) {
             pages.value = images.map((imgObj, idx) => ({
               id: Date.now() + idx,
@@ -1481,16 +1462,11 @@ const handleRouteChange = async () => {
             }));
             currentPageIndex.value = 0;
             await renderAllPages();
-            console.log('[STAMP-DEBUG] renderAllPages done, now adding stamp');
 
             try {
               const stampMeta = await apiService.getStampMetadata(newPdfId);
-              console.log('[STAMP-DEBUG] Got stamp metadata:', stampMeta);
-              console.log('[STAMP-DEBUG] addStampBlockToCanvas is:', typeof addStampBlockToCanvas);
-              console.log('[STAMP-DEBUG] canvas.value is:', !!canvas.value);
               if (addStampBlockToCanvas) {
                 addStampBlockToCanvas(stampMeta);
-                console.log('[STAMP-DEBUG] Stamp block added!');
                 setTimeout(async () => {
                   try {
                     saveCurrentPageState();
@@ -1499,14 +1475,13 @@ const handleRouteChange = async () => {
                     fd.append('OriginalFileId', newPdfId);
                     fd.append('editState', JSON.stringify(pagesData));
                     await apiService.savePdfState(fd);
-                    console.log('[STAMP-DEBUG] Stamp auto-saved!');
                   } catch (err) {
-                    console.error('[STAMP-DEBUG] Auto-save stamp failed', err);
+                    console.error('Auto-save stamp failed', err);
                   }
                 }, 500);
               }
             } catch (e) {
-              console.warn('[STAMP-DEBUG] Stamp add failed', e);
+              console.warn('Stamp add failed', e);
             }
           }
         }
@@ -1683,7 +1658,6 @@ const handleRouteChange = async () => {
 
       if (workspaceData.editState) {
         try {
-          pdfUrl.value = tempUrl;
           let parsedState = workspaceData.editState;
           while (typeof parsedState === 'string') {
             parsedState = JSON.parse(parsedState);
@@ -1880,7 +1854,6 @@ onMounted(async () => {
     renderAllPages();
   }
 
-  connectionStatus.value = 'connected';
 
   _wheelHandler = (e) => {
     if (e.ctrlKey) {

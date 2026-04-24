@@ -264,13 +264,12 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted, onUnmounted, triggerRef, computed, watch, toRaw } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, triggerRef, computed, watch } from 'vue';
 
 const props = defineProps({
   canvas: { type: Object, default: null }
 });
 
-const emit = defineEmits(['add-signature-block']);
 
 const activeObject = shallowRef(null);
 const hasSelection = ref(false);
@@ -382,11 +381,6 @@ const handleClickOutside = (e) => {
   if (!e.target.closest('.dropdown-btn') && !e.target.closest('.dropdown-menu')) {
     showOpacity.value = false;
     showSpacing.value = false;
-  }
-
-  const layerPopup = document.querySelector('.layer-popup');
-  const layerBtn = document.querySelector('button[title="เลเยอร์"]');
-  if (layerPopup && !layerPopup.contains(e.target) && (!layerBtn || !layerBtn.contains(e.target))) {
   }
 };
 
@@ -552,7 +546,7 @@ const handleScaleBlur = (event) => {
     event.target.value = activeScale.value;
   } else {
     handleScaleInput(event);
-    saveHistory();
+    props.canvas.fire('object:modified');
   }
 };
 

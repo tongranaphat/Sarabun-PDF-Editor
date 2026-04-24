@@ -7,7 +7,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 import { fabric } from 'fabric';
 import { useEditorStore } from '../stores/editorStore';
 import { apiService } from '../services/apiService';
-import { showNotification } from '../utils/notifications';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 
 export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
@@ -34,9 +33,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     isSidebarOpen
   } = storeToRefs(editorStore);
 
-  const customVarName = ref('');
-  const currentBackground = ref(null);
-  const originalObjectStates = ref({});
   const isPagesSidebarOpen = ref(false);
 
   const cleanFabricObject = (obj) => {
@@ -90,74 +86,11 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     }));
   };
 
-  const sanitizeDocumentTitle = (name) => {
-    return (name || 'Untitled')
-      .replace(/<[^>]*>/g, '')
-      .trim()
-      .substring(0, 50)
-      .replace(/[^a-z0-9\u0E00-\u0E7F _-]/gi, '_');
-  };
-
-  const getMachineId = editorStore.getMachineId;
-
   const isWorkspaceEmpty = () => {
     if (!pages.value || pages.value.length === 0) return true;
     if (pages.value.length > 1) return false;
     const p = pages.value[0];
     return !p.background && (!p.objects || p.objects.length === 0);
-  };
-
-  const checkIsGeneratedPdf = async (file) => {
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const res = await apiService.checkPdfType(formData);
-      return {
-        id: res.id,
-        type: res.type,
-        embeddedLayout: res.embeddedLayout
-      };
-    } catch (e) {
-      console.warn('Server Check PDF skipped/failed. Trying Client-side...', e);
-    }
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      const metadata = await pdf.getMetadata();
-
-      if (metadata && metadata.info) {
-        const subject = metadata.info.Subject;
-        if (subject && subject.startsWith('layout:')) {
-          const base64Str = subject.substring(7);
-          try {
-            const binaryString = atob(base64Str);
-            let jsonStr;
-
-            if (binaryString.charCodeAt(0) === 0xfe && binaryString.charCodeAt(1) === 0xff) {
-              const buf = new Uint8Array(binaryString.length - 2);
-              for (let i = 2; i < binaryString.length; i++) buf[i - 2] = binaryString.charCodeAt(i);
-              jsonStr = new TextDecoder('utf-16be').decode(buf);
-            } else {
-              try {
-                jsonStr = decodeURIComponent(escape(binaryString));
-              } catch {
-                jsonStr = binaryString;
-              }
-            }
-
-            const layout = JSON.parse(jsonStr);
-            return { embeddedLayout: layout };
-          } catch (parseErr) {
-            console.error('Failed to parse client-side layout:', parseErr);
-          }
-        }
-      }
-    } catch (clientErr) {
-      console.error('Client-side PDF check failed:', clientErr);
-    }
-
-    return null;
   };
 
   const processPdfToImages = async (file) => {
@@ -211,96 +144,14 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     }
   };
 
-  const loadReportById = async (id) => {
-    try {
-      const r = await apiService.getReportById(id);
-      if (r) {
-        currentReportId.value = r.id;
-        currentDocumentId.value = null;
-        documentTitle.value = r.name;
-        if (r.pages && Array.isArray(r.pages)) {
-          pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
-          currentPageIndex.value = 0;
-        }
-        if (resetHistory) resetHistory();
-      }
-    } catch (e) {
-      throw e;
-    }
-  };
 
   const resetCanvas = async () => {
     if (!canvas.value) return;
     editorStore.resetState();
-    originalObjectStates.value = {};
     canvas.value.clear();
     canvas.value.setBackgroundColor(null, null);
     if (resetHistory) resetHistory();
   };
-
-  const handleImportWorkspace = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    e.target.value = '';
-
-    if (!isWorkspaceEmpty()) {
-      if (!confirm('The workspace is not empty. Replace it?')) return;
-    }
-
-    await resetCanvas();
-
-    if (file.type === 'application/pdf') {
-      const metadata = await checkIsGeneratedPdf(file);
-      let loaded = false;
-
-      if (metadata && metadata.id) {
-        if (metadata.type === 'report') {
-          try {
-            await loadReportById(metadata.id);
-            loaded = true;
-          } catch (err) {
-            console.error('Report not found on server');
-          }
-        }
-      }
-
-      if (!loaded && metadata && metadata.embeddedLayout) {
-        try {
-          pages.value = sanitizePagesData(metadata.embeddedLayout);
-          currentPageIndex.value = 0;
-          loaded = true;
-        } catch (err) {
-          console.error('Failed to load embedded layout', err);
-        }
-      }
-
-      if (loaded) {
-        if (resetHistory) resetHistory();
-        return;
-      }
-
-      try {
-        const images = await processPdfToImages(file);
-        if (images.length > 0) {
-          pages.value = images.map((imgObj, idx) => ({
-            id: Date.now() + idx,
-            background: imgObj.dataUrl,
-            width: imgObj.width,
-            height: imgObj.height,
-            objects: [],
-            originalBackgroundType: 'PDF'
-          }));
-          currentPageIndex.value = 0;
-        }
-      } catch (err) {
-        alert('Failed to process PDF');
-      }
-    } else {
-      alert('รองรับเฉพาะไฟล์ PDF เท่านั้น');
-    }
-    if (resetHistory) resetHistory();
-  };
-
   const togglePagesSidebar = () => {
     isPagesSidebarOpen.value = !isPagesSidebarOpen.value;
   };
@@ -355,15 +206,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
 
   const currentFileHandle = ref(null);
 
-  const getFullProjectData = () => {
-    return {
-      name: documentTitle.value || 'Untitled Project',
-      pages: preparePagesForSave(),
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      type: 'hybrid-project'
-    };
-  };
 
   const handleUnifiedImport = async () => {
     return new Promise((resolve) => {
@@ -385,7 +227,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
               const res = await apiService.uploadPdf(formData);
               const savedFileId = res.id;
 
-              const backendUrl = apiService.getBackendBase();
               const workspaceData = await apiService.prepareWorkspace(savedFileId);
 
               await resetCanvas();
@@ -474,54 +315,19 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     });
   };
 
-  const loadProjectData = async (data, filename) => {
-    await resetCanvas();
-    documentTitle.value = data.name || filename.replace(/\.(json|pdf|drt)$/i, '');
-    currentDocumentId.value = null;
-    currentReportId.value = null;
-    if (data.pages) {
-      pages.value = sanitizePagesData(data.pages);
-    }
-    currentPageIndex.value = 0;
-    if (resetHistory) resetHistory();
-  };
 
-  const ensureFileHandle = async () => {
-    if (window.showSaveFilePicker && !currentFileHandle.value) {
-      try {
-        const options = {
-          suggestedName: `${sanitizeDocumentTitle(documentTitle.value)}.pdf`,
-          types: [
-            {
-              description: 'PDF Document',
-              accept: { 'application/pdf': ['.pdf'] }
-            }
-          ]
-        };
-        currentFileHandle.value = await window.showSaveFilePicker(options);
-        return !!currentFileHandle.value;
-      } catch (err) {
-        if (err.name === 'AbortError') return false;
-        console.error('File picker failed:', err);
-        return false;
-      }
-    }
-    return true;
-  };
 
   return {
     documentTitle,
-    currentBackground,
     currentDocumentId,
     currentReportId,
-    originalObjectStates,
     pages,
     currentPageIndex,
     isSidebarOpen,
+    currentFileHandle,
 
     saveReport,
     resetCanvas,
-    handleImportWorkspace,
     togglePagesSidebar,
     getDefaultPageImage,
     cleanFabricObject,
@@ -529,7 +335,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     sanitizePagesData,
     isPagesSidebarOpen,
     handleUnifiedImport,
-    ensureFileHandle,
     processPdfToImages,
     saveFileWithFallback,
     setDocumentCallbacks

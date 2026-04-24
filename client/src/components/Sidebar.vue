@@ -2,26 +2,18 @@
   <aside class="sidebar-container" @mouseleave="handleMouseLeave">
     <div class="sidebar-rail">
       <div class="rail-items">
-        <button
-          @click="handleTabClick('pages')"
-          @mouseenter="handleMouseEnter('pages')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
-          ]"
-        >
+        <button @click="handleTabClick('pages')" @mouseenter="handleMouseEnter('pages')" :class="[
+          'rail-btn',
+          { active: activeTab === 'pages' && isOpen, pinned: isPinned && activeTab === 'pages' }
+        ]">
           <span class="rail-icon icon-page"></span>
           <span class="rail-label">หน้าหนังสือ</span>
         </button>
 
-        <button
-          @click="handleTabClick('data')"
-          @mouseenter="handleMouseEnter('data')"
-          :class="[
-            'rail-btn',
-            { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
-          ]"
-        >
+        <button @click="handleTabClick('data')" @mouseenter="handleMouseEnter('data')" :class="[
+          'rail-btn',
+          { active: activeTab === 'data' && isOpen, pinned: isPinned && activeTab === 'data' }
+        ]">
           <span class="rail-icon icon-data"></span>
           <span class="rail-label">ข้อมูลเกษียณ</span>
         </button>
@@ -37,43 +29,29 @@
 
         <div class="panel-header-title" v-if="activeTab === 'data'">
           <span class="panel-header-icon icon-data-header"></span>
-          <h3 class="panel-header-text">ข้อมูลเกษียณ</h3>
+          <h3 class="panel-header-text">ข้อมูลเกษียณหนังสือ</h3>
         </div>
       </div>
       <div class="panel-content">
         <div v-if="activeTab === 'pages'" class="tab-pane-pages">
           <div class="pages-list" @mouseleave="clearDragState">
-            <div
-              v-for="(page, index) in pages"
-              :key="page.id"
-              :class="[
-                'page-item-sidebar',
-                {
-                  active: isOpen && currentPageIndex === index,
-                  disabled: !isCanvasReady,
-                  dragging: draggedPageIndex === index,
-                  'drag-target-top': dragOverIndex === index && dragPosition === 'top',
-                  'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
-                }
-              ]"
-              draggable="true"
-              @dragstart="onPageDragStart($event, index)"
-              @dragover.prevent="onPageDragOver($event, index)"
-              @drop="onPageDrop($event, index)"
-              @dragend="onPageDragEnd"
-              @click="isCanvasReady ? $emit('page-click', index) : null"
-            >
+            <div v-for="(page, index) in pages" :key="page.id" :class="[
+              'page-item-sidebar',
+              {
+                active: isOpen && currentPageIndex === index,
+                disabled: !isCanvasReady,
+                dragging: draggedPageIndex === index,
+                'drag-target-top': dragOverIndex === index && dragPosition === 'top',
+                'drag-target-bottom': dragOverIndex === index && dragPosition === 'bottom'
+              }
+            ]" draggable="true" @dragstart="onPageDragStart($event, index)"
+              @dragover.prevent="onPageDragOver($event, index)" @drop="onPageDrop($event, index)"
+              @dragend="onPageDragEnd" @click="isCanvasReady ? $emit('page-click', index) : null">
               <div class="page-entry">
                 <div class="page-thumb">
-                  <img
-                    :src="page.background || getDefaultPageImage(index)"
-                    :alt="`Page ${index + 1}`"
-                  />
-                  <button
-                    class="del-page-btn"
-                    @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
-                    v-if="pages.length > 1"
-                  >
+                  <img :src="page.background || getDefaultPageImage(index)" :alt="`Page ${index + 1}`" />
+                  <button class="del-page-btn" @click.stop="isCanvasReady ? $emit('delete-page', index) : null"
+                    v-if="pages.length > 1">
                     <span class="icon-delete"></span>
                   </button>
                 </div>
@@ -89,15 +67,9 @@
           <div class="data-section" v-if="signatories.length > 0">
             <h4 class="label-small">บล็อกลายเซ็น:</h4>
             <div class="var-list">
-              <button
-                v-for="sig in signatories"
-                :key="sig.id"
-                draggable="true"
-                @dragstart="onSignatureDragStart($event, sig)"
-                @click="$emit('add-signature-block', sig)"
-                class="var-btn"
-                :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName"
-              >
+              <button v-for="sig in signatories" :key="sig.id" draggable="true"
+                @dragstart="onSignatureDragStart($event, sig)" @click="$emit('add-signature-block', sig)"
+                class="var-btn" :title="sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName">
                 <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
                 <span class="var-btn-text">
                   {{ sig.position ? `${sig.fullName} (${sig.position})` : sig.fullName }}
@@ -108,12 +80,8 @@
 
           <div class="data-section">
             <h4 class="label-small">ข้อความทั่วไป:</h4>
-            <button
-              @click="handleAddCustomText"
-              class="var-btn"
-              draggable="true"
-              @dragstart="onCustomTextDragStart($event)"
-            >
+            <button @click="handleAddCustomText" class="var-btn" draggable="true"
+              @dragstart="onCustomTextDragStart($event)">
               <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
               <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
             </button>
@@ -165,30 +133,19 @@ const handleTabClick = (tabId) => {
 };
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: true
-  },
-  connectionStatus: String,
-  isCanvasReady: Boolean,
-  pages: {
-    type: Array,
-    default: () => []
-  },
-  currentPageIndex: Number
+  isOpen: Boolean,
+  pages: Array,
+  currentPageIndex: Number,
+  isCanvasReady: Boolean
 });
 
 const emit = defineEmits([
-  'reset-canvas',
-  'import-workspace',
-  'add-signature-block',
-  'toggle',
-  'open',
-  'close',
-  'delete-page',
   'page-click',
+  'delete-page',
   'page-drop',
-  'unified-import'
+  'add-signature-block',
+  'open',
+  'close'
 ]);
 
 const draggedPageIndex = ref(null);
@@ -228,10 +185,6 @@ const onPageDrop = (e, targetIndex) => {
   emit('page-drop', { sourceIndex, targetIndex, position });
 };
 
-const onContainerDragStart = (e, block) => {
-  e.dataTransfer.setData('containerBlock', JSON.stringify(block));
-  e.dataTransfer.effectAllowed = 'copy';
-};
 
 const onSignatureDragStart = (e, sig) => {
   e.dataTransfer.setData('type', 'SIGNATURE_BLOCK');

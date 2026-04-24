@@ -2,9 +2,7 @@ import { CANVAS_CONSTANTS } from '../constants/canvas';
 
 export function useEditablePdf() {
   const PDF_W = 595.28;
-  const PDF_H = 841.89;
   const CVS_W = CANVAS_CONSTANTS.PAGE_WIDTH;
-  const SCALE = PDF_W / CVS_W;
 
   const generateHybridPdfBlob = async (
     canvasImagesOrPages,
@@ -561,74 +559,6 @@ export function useEditablePdf() {
     }
   };
 
-  const createFontLoader = () => {
-    const fontCache = new Map();
-    const loadingPromises = new Map();
-    const MAX_FONT_CACHE_SIZE = 20;
-    const FONT_LOAD_TIMEOUT = 10000;
-
-    const loadFontSafe = async (pdfDoc, family, weight = 'normal', style = 'normal') => {
-      const key = `${family}-${weight}-${style}`;
-
-      if (fontCache.has(key)) return fontCache.get(key);
-      if (loadingPromises.has(key)) return loadingPromises.get(key);
-
-      if (fontCache.size >= MAX_FONT_CACHE_SIZE) {
-        const firstKey = fontCache.keys().next().value;
-        fontCache.delete(firstKey);
-      }
-
-      const loadPromise = new Promise(async (resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          loadingPromises.delete(key);
-          reject(new Error(`Font load timeout: ${key}`));
-        }, FONT_LOAD_TIMEOUT);
-
-        try {
-          let font = null;
-
-          if (['Helvetica', 'Arial', 'Times', 'Courier'].some((n) => family.includes(n))) {
-            const base = family.includes('Times')
-              ? 'Times'
-              : family.includes('Courier')
-                ? 'Courier'
-                : 'Helvetica';
-
-            if (weight === 'bold' && style === 'italic') {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts[`${base}BoldOblique`]);
-            } else if (weight === 'bold') {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts[`${base}Bold`]);
-            } else if (style === 'italic') {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts[`${base}Oblique`]);
-            } else {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts[base]);
-            }
-          } else {
-            try {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts.Helvetica);
-            } catch (customError) {
-              font = await pdfDoc.embedFont(window.PDFLib.StandardFonts.Helvetica);
-            }
-          }
-
-          clearTimeout(timeoutId);
-          loadingPromises.delete(key);
-          fontCache.set(key, font);
-          resolve(font);
-        } catch (error) {
-          clearTimeout(timeoutId);
-          loadingPromises.delete(key);
-          reject(error);
-        }
-      });
-
-      loadingPromises.set(key, loadPromise);
-      return loadPromise;
-    };
-
-    return { loadFontSafe, cleanup: () => fontCache.clear() };
-  };
-
   const captureCanvasPageSafe = async (
     canvas,
     leftOffset,
@@ -680,7 +610,6 @@ export function useEditablePdf() {
 
   return {
     generateHybridPdfBlob,
-    createFontLoader,
     captureCanvasPageSafe
   };
 }

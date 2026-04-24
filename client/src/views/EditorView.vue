@@ -1,37 +1,14 @@
 <template>
   <div class="app-layout">
-    <TopNavbar
-      :zoom-level="zoomLevel"
-      :is-generating="isGenerating"
-      :pdf-quality="pdfQuality"
-      @go-home="goHome"
-      @undo="undo"
-      @redo="redo"
-      @zoom-in="zoomIn"
-      @zoom-out="zoomOut"
-      @save-report="handleSaveProject"
-      @generate-pdf="handleExport"
-      @reset-project="handleReset"
-      @update:pdfQuality="pdfQuality = $event"
-    />
+    <TopNavbar :zoom-level="zoomLevel" :is-generating="isGenerating" :pdf-quality="pdfQuality" @go-home="goHome"
+      @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @save-report="handleSaveProject"
+      @generate-pdf="handleExport" @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
 
-    <Sidebar
-      :isOpen="isSidebarOpen"
-      :connectionStatus="connectionStatus"
-      :isCanvasReady="isCanvasReady"
-      :pages="pages"
-      :currentPageIndex="currentPageIndex"
-      @toggle="toggleSidebar"
-      @open="isSidebarOpen = true"
-      @close="isSidebarOpen = false"
-      @reset-canvas="goHome"
-      @import-workspace="handleImportWorkspaceWrapper"
-      @delete-page="deletePage"
-      @page-click="scrollToPage"
-      @page-drop="handlePageDrop"
-      @add-signature-block="handleAddSignatureBlock"
-      @add-custom-variable="() => {}"
-    />
+    <Sidebar :isOpen="isSidebarOpen" :connectionStatus="connectionStatus" :isCanvasReady="isCanvasReady" :pages="pages"
+      :currentPageIndex="currentPageIndex" @toggle="toggleSidebar" @open="isSidebarOpen = true"
+      @close="isSidebarOpen = false" @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper"
+      @delete-page="deletePage" @page-click="scrollToPage" @page-drop="handlePageDrop"
+      @add-signature-block="handleAddSignatureBlock" @add-custom-variable="() => { }" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
       <div class="scroll-center-helper">
@@ -49,22 +26,17 @@
       <PropertiesPanel :canvas="canvas" />
     </div>
 
-    <ExportOverlay
-      :visible="exportOverlay.visible"
-      :title="exportOverlay.title"
-      :current="exportOverlay.current"
-      :total="exportOverlay.total"
-      :stage="exportOverlay.stage"
-    />
+    <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
+      :total="exportOverlay.total" :stage="exportOverlay.stage" />
 
-    <SignatureModal
-      :is-visible="signatureModal.visible"
-      :sig-data="signatureModal.data"
-      @confirm="handleSignatureConfirm"
-      @cancel="handleSignatureCancel"
-    />
+    <SignatureModal :is-visible="signatureModal.visible" :sig-data="signatureModal.data"
+      @confirm="handleSignatureConfirm" @cancel="handleSignatureCancel" />
+
+    <FileNameModal :is-visible="fileNameModal.visible" :default-name="fileNameModal.defaultName"
+      @confirm="handleFileNameConfirm" @cancel="handleFileNameCancel" />
   </div>
 </template>
+
 
 <script setup>
 import { onMounted, ref, watch, nextTick, onUnmounted, computed } from 'vue';
@@ -74,6 +46,8 @@ import PropertiesPanel from '../components/PropertiesPanel.vue';
 import Sidebar from '../components/Sidebar.vue';
 import ExportOverlay from '../components/ExportOverlay.vue';
 import SignatureModal from '../components/SignatureModal.vue';
+import FileNameModal from '../components/FileNameModal.vue';
+
 
 import { useCanvas } from '../composables/useCanvas';
 import { useDocument } from '../composables/useDocument';
@@ -138,6 +112,33 @@ const signatureModal = ref({
   data: null
 });
 
+const fileNameModal = ref({
+  visible: false,
+  defaultName: ''
+});
+let fileNameResolver = null;
+
+const promptFileName = (defaultName) => {
+  fileNameModal.value = {
+    visible: true,
+    defaultName
+  };
+  return new Promise((resolve) => {
+    fileNameResolver = resolve;
+  });
+};
+
+const handleFileNameConfirm = (name) => {
+  fileNameModal.value.visible = false;
+  if (fileNameResolver) fileNameResolver(name);
+};
+
+const handleFileNameCancel = () => {
+  fileNameModal.value.visible = false;
+  if (fileNameResolver) fileNameResolver(null);
+};
+
+
 let activePdfId = null;
 
 const triggerTempCleanup = () => {
@@ -149,7 +150,7 @@ const triggerTempCleanup = () => {
     if (navigator.sendBeacon) {
       navigator.sendBeacon(cleanupUrl);
     } else {
-      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => {});
+      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => { });
     }
 
     activePdfId = null;
@@ -747,10 +748,22 @@ const handleExport = async () => {
         pdfMode.value
       );
 
+      hideExportOverlay();
+
       updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไฟล์...');
       await yieldToMain();
 
-      const defaultFileName = `${documentTitle.value || 'report'}.pdf`;
+      let finalFileName = documentTitle.value || 'report';
+
+      if (!window.showSaveFilePicker) {
+        const chosenName = await promptFileName(finalFileName);
+        if (chosenName === null) {
+          return;
+        }
+        finalFileName = chosenName;
+      }
+
+      const defaultFileName = `${finalFileName}.pdf`;
       const saveResult = await saveFileWithFallback(pdfBlob, defaultFileName);
 
       if (!saveResult.success) {
@@ -905,7 +918,7 @@ const renderAllPages = async () => {
 
     canvas.value.discardActiveObject();
     canvas.value.clear();
-    canvas.value.setBackgroundColor(null, () => {});
+    canvas.value.setBackgroundColor(null, () => { });
 
     const actualZoom = zoomLevel.value || 1;
 
@@ -2037,7 +2050,7 @@ onUnmounted(() => {
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.floating-panel-anchor > * {
+.floating-panel-anchor>* {
   pointer-events: auto;
 }
 

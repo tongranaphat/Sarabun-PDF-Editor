@@ -3,20 +3,11 @@ import { fabric } from 'fabric';
 import { v4 as uuidv4 } from 'uuid';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 
-const memoryStats = {
-  objectsCreated: 0,
-  objectsDestroyed: 0,
-  clipPathsCreated: 0,
-  clipPathsDestroyed: 0,
-  eventListenersAdded: 0,
-  eventListenersRemoved: 0
-};
 
 const CUSTOM_PROPS = [
   'id',
   'selectable',
   'name',
-  'data',
   'textBaseline',
   'angle',
   'isSignatureBlock',
@@ -668,12 +659,6 @@ export function useCanvas() {
     }
   };
 
-  const onDragStart = (e, key) => {
-    e.dataTransfer.setData('variable', key);
-  };
-  const onDrop = (e) => {
-    const key = e.dataTransfer.getData('variable');
-  };
 
   const saveCurrentPageStateAtomic = (canvas, pages, zoomLevel) => {
     if (!canvas || !pages) return;
@@ -853,12 +838,10 @@ export function useCanvas() {
             obj.clipPath.dispose();
           }
           obj.clipPath = null;
-          memoryStats.clipPathsDestroyed++;
         }
 
         if (obj.off && typeof obj.off === 'function') {
           obj.off();
-          memoryStats.eventListenersRemoved++;
         }
 
         if (obj.dispose && typeof obj.dispose === 'function') {
@@ -878,7 +861,6 @@ export function useCanvas() {
         }
 
         cleanedCount++;
-        memoryStats.objectsDestroyed++;
       } catch (cleanupError) {
         console.error('Error cleaning up object:', cleanupError);
       }
@@ -902,29 +884,6 @@ export function useCanvas() {
     zoomLevel.value = 1;
   };
 
-  const getMemoryStats = () => {
-    return { ...memoryStats };
-  };
-
-  const resetMemoryStats = () => {
-    memoryStats.objectsCreated = 0;
-    memoryStats.objectsDestroyed = 0;
-    memoryStats.clipPathsCreated = 0;
-    memoryStats.clipPathsDestroyed = 0;
-    memoryStats.eventListenersAdded = 0;
-    memoryStats.eventListenersRemoved = 0;
-  };
-
-  const trackObjectCreation = (obj) => {
-    memoryStats.objectsCreated++;
-    if (obj.clipPath) {
-      memoryStats.clipPathsCreated++;
-    }
-  };
-
-  const trackEventListener = () => {
-    memoryStats.eventListenersAdded++;
-  };
 
   const periodicCleanup = (canvas, intervalMs = 30000) => {
     let cleanupInterval = null;
@@ -1012,8 +971,6 @@ export function useCanvas() {
     initCanvas,
     removeSelectedObject,
     addImageToCanvas,
-    onDragStart,
-    onDrop,
     capturePageAsImage,
     updateCanvasZoom,
 
@@ -1022,10 +979,6 @@ export function useCanvas() {
     fitToScreen,
 
     cleanupCanvasObjects,
-    getMemoryStats,
-    resetMemoryStats,
-    trackObjectCreation,
-    trackEventListener,
     periodicCleanup,
 
     saveCurrentPageStateAtomic,

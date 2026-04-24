@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { asyncHandler } = require('../utils/errorHandler');
+const prisma = require('../prismaClient');
+
 
 router.get(
     '/health',
@@ -15,10 +17,8 @@ router.get(
         };
 
         try {
-            const { PrismaClient } = require('@prisma/client');
-            const prisma = new PrismaClient();
             await prisma.$queryRaw`SELECT 1`;
-            await prisma.$disconnect();
+
             healthCheck.database = 'connected';
         } catch (error) {
             healthCheck.database = 'disconnected';

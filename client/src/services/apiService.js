@@ -1,15 +1,11 @@
 import axios from 'axios';
 
-const currentOrigin = window.location.origin;
-
-let envApiUrl = import.meta.env.VITE_API_URL || '/api';
-
-if (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1')) {
-  envApiUrl = '/api';
-}
+const MANUAL_API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 const BACKEND_PORT = import.meta.env.VITE_API_PORT || '4011';
-const API_BASE = `${currentOrigin.replace(/:\d+$/, '')}:${BACKEND_PORT}${envApiUrl}`;
+const envApiUrl = import.meta.env.VITE_API_URL || '/api';
+
+const API_BASE = MANUAL_API_BASE || `${window.location.origin.replace(/:\d+$/, '')}:${BACKEND_PORT}${envApiUrl}`;
 const BACKEND_BASE = API_BASE.replace('/api', '');
 
 const api = axios.create({

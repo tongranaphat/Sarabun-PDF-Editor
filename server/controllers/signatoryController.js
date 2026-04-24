@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../prismaClient');
 const logger = require('../utils/logger');
 
 exports.getSignatories = async (req, res) => {

@@ -7,6 +7,8 @@ const fs = require('fs');
 
 const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
+const prisma = require('./prismaClient');
+
 
 const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
@@ -20,7 +22,8 @@ const stampConfigRoutes = require('./routes/stampConfigRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const prisma = new PrismaClient();
+
+
 
 app.use(
     cors({

@@ -1,9 +1,7 @@
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 
-export function useCanvasEvents(canvas, pages, currentPageIndex, saveHistory, setHistoryLock) {
+export function useCanvasEvents(canvas, pages, currentPageIndex, saveHistory) {
   if (!canvas || !pages) return { initCanvasEvents: () => {} };
-
-  const savedClipPaths = new WeakMap();
 
   const updateObjectClipPath = (obj) => {
     if (!obj) return;
@@ -66,9 +64,6 @@ export function useCanvasEvents(canvas, pages, currentPageIndex, saveHistory, se
     if (!objects || !objects.length) return;
     objects.forEach((obj) => {
       if (!obj) return;
-      if (obj.clipPath !== undefined) {
-        savedClipPaths.set(obj, obj.clipPath);
-      }
       obj.clipPath = null;
       obj.dirty = true;
     });
@@ -112,8 +107,6 @@ export function useCanvasEvents(canvas, pages, currentPageIndex, saveHistory, se
       }
     }
   };
-
-  const handleDropSnap = (obj) => {};
 
   const handleTextScaling = (obj) => {
     if (!obj) return;

@@ -43,10 +43,6 @@ export const apiService = {
     return response.data;
   },
 
-  async addVariable(variableData) {
-    const response = await api.post('/variables', variableData);
-    return response.data;
-  },
 
   async getSignatories() {
     const response = await api.get('/signatories');
@@ -62,6 +58,7 @@ export const apiService = {
     const response = await api.post('/pdf/import-local', { localPath });
     return response.data;
   },
+
 
   async prepareWorkspace(id) {
     const response = await api.get(`/pdf/workspace/${id}`);
@@ -91,12 +88,6 @@ export const apiService = {
     return response.data;
   },
 
-  async checkPdfType(formData) {
-    const response = await api.post('/check-pdf-type', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data;
-  },
 
   async uploadPdf(formData) {
     const response = await api.post('/pdf/upload', formData, {
@@ -111,29 +102,11 @@ export const apiService = {
     return response.data;
   },
 
-  async healthCheck() {
-    const response = await api.get('/health');
-    return response.data;
-  },
 
   getBackendBase() {
     return BACKEND_BASE;
   },
 
-  async getStampConfig() {
-    const response = await api.get('/stamp-config');
-    return response.data;
-  },
-
-  async updateStampConfig(id, data) {
-    const response = await api.put(`/stamp-config/${id}`, data);
-    return response.data;
-  },
-
-  async createStampConfig(data) {
-    const response = await api.post('/stamp-config', data);
-    return response.data;
-  }
 };
 
 export default apiService;

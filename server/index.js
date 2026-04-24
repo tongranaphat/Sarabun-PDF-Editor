@@ -23,8 +23,6 @@ const stampConfigRoutes = require('./routes/stampConfigRoutes');
 const app = express();
 const server = http.createServer(app);
 
-
-
 app.use(
     cors({
         origin: function (origin, callback) {

@@ -103,11 +103,16 @@ export const apiService = {
   },
 
 
+  async updateStampConfig(id, data) {
+    const response = await api.put(`/stamp-config/${id}`, data);
+    return response.data;
+  },
+
   getBackendBase() {
     return BACKEND_BASE;
   },
-
 };
+
 
 export default apiService;
 export { api };

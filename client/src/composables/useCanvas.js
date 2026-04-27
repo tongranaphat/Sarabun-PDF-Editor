@@ -12,9 +12,12 @@ const CUSTOM_PROPS = [
   'angle',
   'isSignatureBlock',
   'isSignaturePrefix',
+  'isStampBlock',
+  'stampData',
   'linkedId',
   'sigData'
 ];
+
 
 const MAX_HISTORY_SIZE = 30;
 const HISTORY_DEBOUNCE_MS = 300;
@@ -119,6 +122,11 @@ export function useCanvas() {
       if (!canvas.value || isHistoryLocked.value) return;
 
       const json = canvas.value.toJSON(CUSTOM_PROPS);
+      if (json.objects) {
+        json.objects = json.objects.filter(
+          (obj) => obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.id !== 'page-divider'
+        );
+      }
       const jsonString = JSON.stringify(json);
 
       if (
@@ -145,21 +153,45 @@ export function useCanvas() {
       redoStack.value.push(current);
 
       const previous = historyStack.value[historyStack.value.length - 1];
-      canvas.value.loadFromJSON(JSON.parse(previous), async () => {
-        canvas.value.renderAll();
-        relinkSignatures();
-        if (typeof _callbacks.saveCurrentPageState === 'function')
-          _callbacks.saveCurrentPageState();
-
-        if (typeof _callbacks.renderAllPages === 'function') {
-          await _callbacks.renderAllPages();
-        }
-
-        setTimeout(() => {
-          isHistoryLocked.value = false;
-        }, 100);
-      });
+      restoreStateNoFlicker(previous);
     }
+  };
+
+  const restoreStateNoFlicker = (jsonString) => {
+    if (!canvas.value) return;
+    const json = JSON.parse(jsonString);
+    const objectsToLoad = json.objects || [];
+
+    canvas.value.renderOnAddRemove = false;
+
+    const currentObjs = canvas.value.getObjects();
+    currentObjs.forEach((obj) => {
+      if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.id !== 'page-divider') {
+        canvas.value.remove(obj);
+      }
+    });
+
+    fabric.util.enlivenObjects(objectsToLoad, async (enlivenedObjects) => {
+      enlivenedObjects.forEach((obj) => {
+        canvas.value.add(obj);
+      });
+
+      canvas.value.renderOnAddRemove = true;
+      canvas.value.renderAll();
+
+      relinkSignatures();
+
+      if (typeof _callbacks.renderAllPages === 'function') {
+        await _callbacks.renderAllPages({ infraOnly: true });
+      }
+
+      if (typeof _callbacks.saveCurrentPageState === 'function')
+        _callbacks.saveCurrentPageState();
+
+      setTimeout(() => {
+        isHistoryLocked.value = false;
+      }, 100);
+    });
   };
 
   const redo = () => {
@@ -168,20 +200,7 @@ export function useCanvas() {
       const next = redoStack.value.pop();
       historyStack.value.push(next);
 
-      canvas.value.loadFromJSON(JSON.parse(next), async () => {
-        canvas.value.renderAll();
-        relinkSignatures();
-        if (typeof _callbacks.saveCurrentPageState === 'function')
-          _callbacks.saveCurrentPageState();
-
-        if (typeof _callbacks.renderAllPages === 'function') {
-          await _callbacks.renderAllPages();
-        }
-
-        setTimeout(() => {
-          isHistoryLocked.value = false;
-        }, 100);
-      });
+      restoreStateNoFlicker(next);
     }
   };
 
@@ -324,10 +343,11 @@ export function useCanvas() {
   ) => {
     if (!canvas.value) return;
 
-    const maxTextWidth = 145;
-    const fontSize = 13;
+    const scale = getPageScaleAtPos(dropY);
+    const maxTextWidth = 165 * scale;
+    const fontSize = 15 * scale;
     const fontFamily = 'Sarabun';
-    const GAP = 3;
+    const GAP = 4 * scale;
 
     const sharedLinkedId = `link_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
@@ -339,7 +359,7 @@ export function useCanvas() {
       const balancer = new fabric.Rect({
         left: centerX,
         top: currentInternalY,
-        width: 145,
+        width: 165 * scale,
         height: 1,
         fill: 'transparent',
         originX: 'center',
@@ -352,30 +372,38 @@ export function useCanvas() {
       const textToShow = customPrefixText !== null ? customPrefixText : sigData.prefixText;
 
       if (textToShow && textToShow.trim() !== '') {
+        let prefixFontSize = fontSize;
+        if (textToShow.length >= 60) {
+          prefixFontSize = fontSize - 2 * scale;
+        } else if (textToShow.length >= 35) {
+          prefixFontSize = fontSize - 1 * scale;
+        }
+
         const wrappedPrefix =
           typeof wrapThaiText === 'function'
-            ? wrapThaiText(textToShow, maxTextWidth, fontSize, fontFamily)
+            ? wrapThaiText(textToShow, maxTextWidth, prefixFontSize, fontFamily)
             : textToShow;
 
         const prefixTextbox = new fabric.Textbox(wrappedPrefix, {
           left: centerX,
           top: currentInternalY,
-          fontSize: fontSize,
+          fontSize: prefixFontSize,
           fontFamily: fontFamily,
           textAlign: 'center',
-          width: maxTextWidth + 10,
+          width: maxTextWidth + 15 * scale,
           originX: 'center',
           originY: 'top',
+          fill: '#003399',
           editable: false,
           selectable: false,
           evented: false
         });
         objects.push(prefixTextbox);
-        currentInternalY += prefixTextbox.getScaledHeight() + GAP + 5;
+        currentInternalY += prefixTextbox.getScaledHeight() + GAP + 8 * scale;
       }
 
       if (imgObj) {
-        imgObj.scaleToHeight(30);
+        imgObj.scaleToHeight(45 * scale);
         imgObj.set({
           originX: 'center',
           originY: 'top',
@@ -385,9 +413,9 @@ export function useCanvas() {
           evented: false
         });
         objects.push(imgObj);
-        currentInternalY += imgObj.getScaledHeight() + 5;
+        currentInternalY += imgObj.getScaledHeight() + 5 * scale;
       } else {
-        currentInternalY += 30;
+        currentInternalY += 45 * scale;
       }
 
       const nameText = new fabric.Text(`( ${sigData.fullName} )`, {
@@ -397,11 +425,12 @@ export function useCanvas() {
         originY: 'top',
         top: currentInternalY,
         left: centerX,
+        fill: '#003399',
         selectable: false,
         evented: false
       });
       objects.push(nameText);
-      currentInternalY += nameText.height + 2;
+      currentInternalY += nameText.height + 4 * scale;
 
       if (sigData.position) {
         const wrappedPos =
@@ -417,6 +446,7 @@ export function useCanvas() {
           textAlign: 'center',
           top: currentInternalY,
           left: centerX,
+          fill: '#003399',
           selectable: false,
           evented: false
         });
@@ -487,15 +517,45 @@ export function useCanvas() {
     });
   };
 
+  const getPageScaleAtPos = (y) => {
+    if (!canvas.value) return 1;
+    const bgObjects = canvas.value
+      .getObjects()
+      .filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image');
+    if (bgObjects.length === 0) return 1;
+
+    const targetBg = bgObjects.find(
+      (bg) =>
+        y >= bg.top && y <= bg.top + bg.getScaledHeight() + (CANVAS_CONSTANTS.PAGE_GAP || 40)
+    );
+    if (targetBg) {
+      return targetBg.getScaledWidth() / CANVAS_CONSTANTS.PAGE_WIDTH;
+    }
+
+    bgObjects.sort((a, b) => a.top - b.top);
+    return bgObjects[0].getScaledWidth() / CANVAS_CONSTANTS.PAGE_WIDTH;
+  };
+
   const addStampBlockToCanvas = (metadata) => {
     if (!canvas.value) return;
 
     const { schoolName, seqNo, date, time, receiverName } = metadata;
 
+    const allBgObjects = canvas.value
+      .getObjects()
+      .filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image');
+    let scale = 1;
+    let firstPage = null;
+    if (allBgObjects.length > 0) {
+      allBgObjects.sort((a, b) => a.top - b.top);
+      firstPage = allBgObjects[0];
+      scale = firstPage.getScaledWidth() / CANVAS_CONSTANTS.PAGE_WIDTH;
+    }
+
     const objects = [];
     const fontFamily = 'Sarabun';
-    const fontSize = 10;
-    let currentY = 8;
+    const fontSize = 13 * scale;
+    let currentY = 12 * scale;
 
     const fieldsData = [
       { label: 'เลขที่รับ', val: String(seqNo || '') },
@@ -504,16 +564,16 @@ export function useCanvas() {
       { label: 'ผู้รับ', val: receiverName || '' }
     ];
 
-    let maxValWidth = 60;
+    let maxValWidth = 45 * scale;
     const labels = [];
     const values = [];
 
     fieldsData.forEach((field) => {
-      const labelItem = new fabric.Text(field.label, { fontSize, fontFamily, fill: '#000000' });
+      const labelItem = new fabric.Text(field.label, { fontSize, fontFamily, fill: '#003399' });
       const valItem = new fabric.Text(field.val, {
-        fontSize: fontSize + 1,
+        fontSize: fontSize + 1 * scale,
         fontFamily,
-        fill: '#000000'
+        fill: '#003399'
       });
       labels.push(labelItem);
       values.push(valItem);
@@ -522,82 +582,66 @@ export function useCanvas() {
       }
     });
 
-    const dynamicBoxWidth = 60 + maxValWidth + 20;
-    const blockWidth = Math.max(160, dynamicBoxWidth);
+    const dynamicBoxWidth = 55 * scale + maxValWidth + 5 * scale;
+    const blockWidth = Math.max(145 * scale, dynamicBoxWidth);
 
-    const schoolText = new fabric.Text(schoolName || 'โรงเรียนทดสอบ', {
-      fontSize: fontSize + 1,
+    const displaySchoolName = schoolName || 'โรงเรียนทดสอบ';
+    let schoolFontSize = fontSize + 1 * scale;
+    if (displaySchoolName.length >= 40) {
+      schoolFontSize = fontSize - 1.5 * scale;
+    } else if (displaySchoolName.length >= 25) {
+      schoolFontSize = fontSize - 0.5 * scale;
+    }
+
+    const schoolText = new fabric.Text(displaySchoolName, {
+      fontSize: schoolFontSize,
       fontFamily: fontFamily,
       fontWeight: 'bold',
-      fill: '#000000',
+      fill: '#003399',
       left: blockWidth / 2,
       top: currentY,
       originX: 'center',
       originY: 'top'
     });
     objects.push(schoolText);
-    currentY += schoolText.height + 5;
+    currentY += schoolText.height + 6 * scale;
 
     for (let i = 0; i < fieldsData.length; i++) {
       const labelItem = labels[i];
       const valItem = values[i];
 
-      labelItem.set({ left: 10, top: currentY });
-      const valCenter = 60 + (blockWidth - 10 - 60) / 2;
+      labelItem.set({ left: 6 * scale, top: currentY });
+      const valCenter = 55 * scale + (blockWidth - 6 * scale - 55 * scale) / 2;
       valItem.set({
         left: valCenter,
-        top: currentY - 1,
+        top: currentY - 1 * scale,
         originX: 'center',
         originY: 'top'
       });
 
       objects.push(labelItem, valItem);
-      currentY += Math.max(labelItem.height, valItem.height) + 5;
+      currentY += Math.max(labelItem.height, valItem.height) + 6 * scale;
     }
 
     const frame = new fabric.Rect({
       left: 0,
       top: 0,
       width: blockWidth,
-      height: currentY + 3,
+      height: currentY + 3 * scale,
       fill: 'transparent',
-      stroke: '#000000',
-      strokeWidth: 1.0,
-      rx: 2,
-      ry: 2
+      stroke: '#003399',
+      strokeWidth: 1.2,
+      rx: 2 * scale,
+      ry: 2 * scale
     });
     objects.unshift(frame);
 
-    let dropX = CANVAS_CONSTANTS.PAGE_WIDTH - blockWidth - 20;
-    let dropY = 30;
+    let dropX = CANVAS_CONSTANTS.PAGE_WIDTH - blockWidth - 95 * scale;
+    let dropY = 40 * scale;
 
-    const allBgObjects = canvas.value
-      .getObjects()
-      .filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image');
-    console.log('[STAMP-POS] BG objects found:', allBgObjects.length);
-    console.log(
-      '[STAMP-POS] All canvas objects:',
-      canvas.value
-        .getObjects()
-        .map((o) => ({ id: o.id, type: o.type, left: o.left, top: o.top, w: o.getScaledWidth?.() }))
-    );
-    if (allBgObjects.length > 0) {
-      allBgObjects.sort((a, b) => a.top - b.top);
-      const firstPage = allBgObjects[0];
-      dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 20;
-      dropY = firstPage.top + 30;
-      console.log('[STAMP-POS] Using BG position:', {
-        bgLeft: firstPage.left,
-        bgWidth: firstPage.getScaledWidth(),
-        dropX,
-        dropY
-      });
-    } else {
-      console.log('[STAMP-POS] No BG found, using defaults:', {
-        dropX,
-        dropY,
-        PAGE_WIDTH: CANVAS_CONSTANTS.PAGE_WIDTH
-      });
+    if (firstPage) {
+      dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 95 * scale;
+      dropY = firstPage.top + 40 * scale;
     }
 
     const stampGroup = new fabric.Group(objects, {
@@ -606,25 +650,24 @@ export function useCanvas() {
       originX: 'left',
       originY: 'top',
       isSignatureBlock: true,
+      isStampBlock: true,
+      stampData: metadata,
       id: `stamp_${Date.now()}`,
       name: `บล็อกเลขที่รับ`
     });
 
+
     canvas.value.add(stampGroup);
     canvas.value.setActiveObject(stampGroup);
     canvas.value.requestRenderAll();
-    console.log('[STAMP-POS] Stamp group added at:', {
-      left: stampGroup.left,
-      top: stampGroup.top,
-      w: stampGroup.width,
-      h: stampGroup.height
-    });
 
     if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
     saveHistory();
   };
 
+
   const addImageToCanvas = async (url, x = 100, y = 100) => {
+
     if (!canvas.value) return;
     fabric.Image.fromURL(
       url,
@@ -963,7 +1006,7 @@ export function useCanvas() {
     resetHistory,
     saveHistory,
     setHistoryLock,
-    setHistoryContext: () => {},
+    setHistoryContext: () => { },
     setCallbacks,
     canUndo: computed(() => historyStack.value.length > 1),
     canRedo: computed(() => redoStack.value.length > 0),
@@ -989,6 +1032,8 @@ export function useCanvas() {
     addSignatureBlockToCanvas,
     addStampBlockToCanvas,
     updateCanvasDimensions,
+
+
     relinkSignatures
   };
 }

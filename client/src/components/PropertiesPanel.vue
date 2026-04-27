@@ -132,7 +132,9 @@
       </div>
     </template>
 
+
     <template v-if="isText || isShape">
+
       <div class="divider" v-if="isText"></div>
 
       <div class="toolbar-group">
@@ -266,9 +268,13 @@
 <script setup>
 import { ref, shallowRef, onMounted, onUnmounted, triggerRef, computed, watch } from 'vue';
 
+
+
 const props = defineProps({
   canvas: { type: Object, default: null }
 });
+
+
 
 
 const activeObject = shallowRef(null);
@@ -449,6 +455,8 @@ const isShape = computed(() => {
 
 const isSignature = computed(() => selectionCategory.value === 'block');
 
+
+
 const isMultiple = computed(() => {
   return activeObject.value?.type === 'activeSelection';
 });
@@ -606,6 +614,8 @@ const setOpacity = (val) => {
   showOpacity.value = false;
 };
 
+
+
 const deleteObject = () => {
   if (!activeObject.value || !props.canvas) return;
 
@@ -705,6 +715,8 @@ onUnmounted(() => {
   white-space: nowrap;
   flex-wrap: nowrap;
 }
+
+
 
 .scale-group {
   margin: 0 4px;

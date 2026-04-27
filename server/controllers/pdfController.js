@@ -589,10 +589,16 @@ const importLocalPath = async (req, res) => {
         const normalizedPath = path.resolve(localPath);
 
         const BLOCKED_PATTERNS = [
-            /\.\.[\\/]/,
+            /^[a-zA-Z]:[\\/]?(Windows|System32|etc|proc|sys|boot)/i,
             /^[\\/]?(Windows|System32|etc|proc|sys|boot)/i,
             /[\\/](\.ssh|\.env|\.git|node_modules)[\\/]?/i
         ];
+
+        // Check for directory traversal before resolving
+        if (/\.\.[\\/]/.test(localPath)) {
+            logger.warn(`[importLocalPath] Blocked path traversal attempt: ${localPath}`);
+            return res.status(403).json({ error: 'Security Policy: เส้นทางไฟล์ไม่ได้รับอนุญาต' });
+        }
 
         for (const pattern of BLOCKED_PATTERNS) {
             if (pattern.test(normalizedPath)) {

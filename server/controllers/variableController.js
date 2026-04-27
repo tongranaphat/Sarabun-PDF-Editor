@@ -1,23 +1,6 @@
 const prisma = require('../prismaClient');
 const { asyncHandler } = require('../utils/errorHandler');
-
-const logger = {
-    info: (message, ...args) => {
-        console.info(`[VARIABLE] ${new Date().toISOString()} - ${message}`, ...args);
-    },
-    error: (message, error) => {
-        console.error(`[VARIABLE ERROR] ${new Date().toISOString()} - ${message}`);
-        if (error) {
-            console.error('Error details:', error.message || error);
-            if (error.stack) {
-                console.error('Stack trace:', error.stack);
-            }
-        }
-    },
-    success: (message, ...args) => {
-        console.info(`[VARIABLE] ${new Date().toISOString()} - ${message}`, ...args);
-    }
-};
+const logger = require('../utils/logger');
 
 const getVariables = asyncHandler(async (req, res) => {
     logger.info('Fetching variables');

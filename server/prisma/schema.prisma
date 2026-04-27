@@ -23,6 +23,9 @@ model Variable {
 
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([key])
+  @@index([scope])
 }
 
 model PdfCache {
@@ -38,6 +41,10 @@ model PdfCache {
   createdAt         DateTime @default(now())
   lastEditAt        DateTime @updatedAt
   stampConfig       StampConfig?
+
+  @@index([OriginalUrlorPath])
+  @@index([FileName])
+  @@index([createdAt])
 }
 
 model Signatory {
@@ -60,5 +67,6 @@ model StampConfig {
   pdfCache     PdfCache @relation(fields: [pdfCacheId], references: [OriginalFileId], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-}
 
+  @@index([seqNo])
+}

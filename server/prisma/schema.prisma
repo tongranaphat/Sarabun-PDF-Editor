@@ -53,9 +53,12 @@ model Signatory {
 model StampConfig {
   id           String   @id @default(uuid())
   schoolName   String   @default("โรงเรียนทดสอบ")
-  seqNo        Int
+  seqNo        String
+  dateStr      String?
+  timeStr      String?
   pdfCacheId   String   @unique
   pdfCache     PdfCache @relation(fields: [pdfCacheId], references: [OriginalFileId], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+

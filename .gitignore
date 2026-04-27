@@ -59,7 +59,10 @@ coverage
 !ERROR_HANDLING.md
 
 # Server Uploads
-server/uploads/*
+server/uploads/c4ad9c81-662a-4742-b616-d3a4940b3489-removebg-preview_0.png
+server/uploads/Signature-removebg-preview_0.png
+server/uploads/signature.png
+server/uploads/ลายเซ็นอนุชา_สะสมทรัพย์_0.png
 !server/uploads/.gitkeep
 
 # Database

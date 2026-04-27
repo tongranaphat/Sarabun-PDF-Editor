@@ -2,10 +2,12 @@ const puppeteer = require('puppeteer');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const { PDFDocument } = require('pdf-lib');
 const { asyncHandler } = require('../utils/errorHandler');
 const prisma = require('../prismaClient');
 const axios = require('axios');
+const logger = require('../utils/logger');
 
 const prepareWorkspace = async (req, res) => {
     try {
@@ -21,22 +23,22 @@ const prepareWorkspace = async (req, res) => {
         const cleanSourcePath = rawSourcePath.replace(/^\//, '');
         const absoluteSource = path.join(__dirname, '..', cleanSourcePath);
 
-        if (!fs.existsSync(absoluteSource)) {
-            console.error(`[prepareWorkspace] File not found on disk: ${absoluteSource}`);
+        try {
+            await fsp.access(absoluteSource);
+        } catch {
+            logger.error(`[prepareWorkspace] File not found on disk: ${absoluteSource}`);
             return res.status(404).json({ error: 'ไม่พบไฟล์ต้นฉบับบนเซิร์ฟเวอร์' });
         }
 
         const tempDirPath = path.join(__dirname, '../uploads/temp');
-        if (!fs.existsSync(tempDirPath)) {
-            fs.mkdirSync(tempDirPath, { recursive: true });
-        }
+        await fsp.mkdir(tempDirPath, { recursive: true });
 
         const tempFileName = `temp_${id}.pdf`;
         const tempFilePath = `/uploads/temp/${tempFileName}`;
         const cleanTempPath = tempFilePath.replace(/^\//, '');
         const absoluteTemp = path.join(__dirname, '..', cleanTempPath);
 
-        fs.copyFileSync(absoluteSource, absoluteTemp);
+        await fsp.copyFile(absoluteSource, absoluteTemp);
 
         await prisma.pdfCache.update({
             where: { OriginalFileId: id },
@@ -64,17 +66,19 @@ const resetToOriginal = async (req, res) => {
         const cleanSourcePath = pdf.FilePath.replace(/^\//, '');
         const absoluteOriginal = path.join(__dirname, '..', cleanSourcePath);
 
-        if (!fs.existsSync(absoluteOriginal)) {
+        try {
+            await fsp.access(absoluteOriginal);
+        } catch {
             return res.status(404).json({
                 error: 'ไม่สามารถรีเซ็ตได้เนื่องจากไฟล์ต้นฉบับสูญหายบนเซิร์ฟเวอร์'
             });
         }
 
         const tempDirPath = path.join(__dirname, '../uploads/temp');
-        if (!fs.existsSync(tempDirPath)) fs.mkdirSync(tempDirPath, { recursive: true });
+        await fsp.mkdir(tempDirPath, { recursive: true });
 
         const absoluteTemp = path.join(__dirname, '..', `uploads/temp/temp_${id}.pdf`);
-        fs.copyFileSync(absoluteOriginal, absoluteTemp);
+        await fsp.copyFile(absoluteOriginal, absoluteTemp);
 
         await prisma.pdfCache.update({
             where: { OriginalFileId: id },
@@ -91,16 +95,17 @@ const resetToOriginal = async (req, res) => {
             tempPath: `/uploads/temp/temp_${id}.pdf`
         });
     } catch (error) {
-        console.error('[resetToOriginal] Error:', error);
+        logger.error('[resetToOriginal] Error:', error);
         res.status(500).json({ error: 'การรีเซ็ตข้อมูลล้มเหลว: ' + error.message });
     }
 };
 
+const UPLOAD_DIR = path.join(__dirname, '../uploads/original/cache');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const dir = path.join(__dirname, '../uploads/original/cache');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
+        cb(null, UPLOAD_DIR);
     },
     filename: function (req, file, cb) {
         cb(null, Date.now() + '-' + file.originalname);
@@ -148,7 +153,7 @@ const importPdfUrl = async (req, res) => {
             }
 
             const uploadDir = path.join(__dirname, '../uploads/original/cache');
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+            await fsp.mkdir(uploadDir, { recursive: true });
 
             const destPath = path.join(uploadDir, exactName);
 
@@ -180,94 +185,6 @@ const importPdfUrl = async (req, res) => {
     } catch (error) {
         console.error('URL Import Error:', error.message);
         res.status(500).json({ error: 'Failed to import file from URL' });
-    }
-};
-
-const autoImportUniversal = async (req, res) => {
-    try {
-        const { url } = req.body;
-        if (!url) return res.status(400).json({ error: 'URL is required' });
-
-        let cachedPdf = await prisma.pdfCache.findFirst({
-            where: { OriginalUrlorPath: url }
-        });
-
-        if (cachedPdf) {
-            return res.status(200).json({
-                ...cachedPdf,
-                id: cachedPdf.OriginalFileId,
-                fileId: cachedPdf.OriginalFileId,
-                filepath: cachedPdf.FilePath
-            });
-        }
-
-        const downloadUrl = convertGDriveUrl(url);
-
-        const response = await axios.get(downloadUrl, { responseType: 'stream' });
-
-        let exactName = `GDrive_Document_${Date.now()}.pdf`;
-        const contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition) {
-            const match = contentDisposition.match(/filename="?([^"]+)"?/);
-            if (match && match[1]) exactName = decodeURIComponent(match[1]);
-        } else {
-            const urlName = path.basename(new URL(downloadUrl).pathname);
-            if (urlName && urlName !== 'uc' && urlName !== 'download') exactName = urlName;
-        }
-
-        const uploadDir = path.join(__dirname, '../uploads/original/cache');
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-        const destPath = path.join(uploadDir, exactName);
-
-        const writer = fs.createWriteStream(destPath);
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-
-        cachedPdf = await prisma.pdfCache.create({
-            data: {
-                FileName: exactName,
-                OriginalUrlorPath: url,
-                FilePath: `/uploads/original/cache/${exactName}`,
-                OriginalFile: true,
-                EditedFile: false
-            }
-        });
-
-        res.status(200).json({
-            ...cachedPdf,
-            id: cachedPdf.OriginalFileId,
-            fileId: cachedPdf.OriginalFileId,
-            filepath: cachedPdf.FilePath
-        });
-    } catch (error) {
-        console.error('Auto Import Error:', error.message);
-        res.status(500).json({ error: 'Failed to auto-import file' });
-    }
-};
-
-const logger = {
-    info: (message, ...args) => {
-        console.info(`[PDF] ${new Date().toISOString()} - ${message}`, ...args);
-    },
-    error: (message, error) => {
-        console.error(`[PDF ERROR] ${new Date().toISOString()} - ${message}`);
-        if (error) {
-            console.error('Error details:', error.message || error);
-            if (error.stack) {
-                console.error('Stack trace:', error.stack);
-            }
-        }
-    },
-    warn: (message, ...args) => {
-        console.warn(`[PDF WARN] ${new Date().toISOString()} - ${message}`, ...args);
-    },
-    success: (message, ...args) => {
-        console.info(`[PDF] ${new Date().toISOString()} - ${message}`, ...args);
     }
 };
 
@@ -549,26 +466,21 @@ const deletePdf = async (req, res) => {
             const absPath = path.join(__dirname, '..', cleanPath);
 
             try {
-                if (fs.existsSync(absPath)) {
-                    fs.unlinkSync(absPath);
-                    console.log(`[deletePdf] ลบไฟล์ต้นฉบับสำเร็จ: ${absPath}`);
-                }
+                await fsp.unlink(absPath);
+                logger.info(`[deletePdf] ลบไฟล์ต้นฉบับสำเร็จ: ${absPath}`);
             } catch (e) {
-                console.warn(`[deletePdf] ลบไฟล์ต้นฉบับไม่สำเร็จ ${absPath}:`, e.message);
+                if (e.code !== 'ENOENT') logger.warn(`[deletePdf] ลบไฟล์ต้นฉบับไม่สำเร็จ ${absPath}: ${e.message}`);
             }
         }
 
         if (record.EditedFilePath) {
             const cleanEditedPath = record.EditedFilePath.replace(/^\//, '');
             const editedAbsPath = path.join(__dirname, '..', cleanEditedPath);
-
             try {
-                if (fs.existsSync(editedAbsPath)) {
-                    fs.unlinkSync(editedAbsPath);
-                    console.log(`[deletePdf] ลบไฟล์ Edited สำเร็จ: ${editedAbsPath}`);
-                }
+                await fsp.unlink(editedAbsPath);
+                logger.info(`[deletePdf] ลบไฟล์ Edited สำเร็จ: ${editedAbsPath}`);
             } catch (e) {
-                console.warn(`[deletePdf] ลบไฟล์ Edited ไม่สำเร็จ ${editedAbsPath}:`, e.message);
+                if (e.code !== 'ENOENT') logger.warn(`[deletePdf] ลบไฟล์ Edited ไม่สำเร็จ ${editedAbsPath}: ${e.message}`);
             }
         }
 
@@ -576,9 +488,9 @@ const deletePdf = async (req, res) => {
             const cleanTempPath = record.TempFilePath.replace(/^\//, '');
             const tempAbsPath = path.join(__dirname, '..', cleanTempPath);
             try {
-                if (fs.existsSync(tempAbsPath)) fs.unlinkSync(tempAbsPath);
+                await fsp.unlink(tempAbsPath);
             } catch (e) {
-                console.warn(`[deletePdf] ลบไฟล์ Temp ไม่สำเร็จ ${tempAbsPath}:`, e.message);
+                if (e.code !== 'ENOENT') logger.warn(`[deletePdf] ลบไฟล์ Temp ไม่สำเร็จ ${tempAbsPath}: ${e.message}`);
             }
         }
 
@@ -608,27 +520,29 @@ const savePdfState = async (req, res) => {
 
         const absoluteEditedPath = path.join(__dirname, '..', newEditedPath.replace(/^\//, ''));
         const editedDir = path.dirname(absoluteEditedPath);
-        if (!fs.existsSync(editedDir)) fs.mkdirSync(editedDir, { recursive: true });
+        await fsp.mkdir(editedDir, { recursive: true });
 
         if (req.file) {
-            fs.copyFileSync(req.file.path, absoluteEditedPath);
-            fs.unlinkSync(req.file.path);
+            await fsp.copyFile(req.file.path, absoluteEditedPath);
+            await fsp.unlink(req.file.path);
         } else {
             const absoluteTemp = path.join(__dirname, '..', `uploads/temp/temp_${OriginalFileId}.pdf`);
-            if (fs.existsSync(absoluteTemp)) {
-                fs.copyFileSync(absoluteTemp, absoluteEditedPath);
+            try {
+                await fsp.copyFile(absoluteTemp, absoluteEditedPath);
+            } catch (e) {
+                if (e.code !== 'ENOENT') throw e;
             }
         }
 
 
         if (pdf.EditedFile && pdf.EditedFilePath) {
             const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
-            if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
+            if (oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
                 try {
-                    fs.unlinkSync(oldPath);
-                    console.log(`[savePdfState] Cleaned up old cache file: ${oldPath}`);
+                    await fsp.unlink(oldPath);
+                    logger.info(`[savePdfState] Cleaned up old cache file: ${oldPath}`);
                 } catch (e) {
-                    console.warn(`[savePdfState] Failed to delete old cache file: ${e.message}`);
+                    if (e.code !== 'ENOENT') logger.warn(`[savePdfState] Failed to delete old cache file: ${e.message}`);
                 }
             }
         }
@@ -674,7 +588,22 @@ const importLocalPath = async (req, res) => {
 
         const normalizedPath = path.resolve(localPath);
 
-        if (!fs.existsSync(normalizedPath)) {
+        const BLOCKED_PATTERNS = [
+            /\.\.[\\/]/,
+            /^[\\/]?(Windows|System32|etc|proc|sys|boot)/i,
+            /[\\/](\.ssh|\.env|\.git|node_modules)[\\/]?/i
+        ];
+
+        for (const pattern of BLOCKED_PATTERNS) {
+            if (pattern.test(normalizedPath)) {
+                logger.warn(`[importLocalPath] Blocked path traversal attempt: ${normalizedPath}`);
+                return res.status(403).json({ error: 'Security Policy: เส้นทางไฟล์ไม่ได้รับอนุญาต' });
+            }
+        }
+
+        try {
+            await fsp.access(normalizedPath);
+        } catch {
             return res.status(404).json({ error: 'File not found: ' + normalizedPath });
         }
 
@@ -693,10 +622,10 @@ const importLocalPath = async (req, res) => {
 
         const fileName = `local_${Date.now()}_${path.basename(normalizedPath)}`;
         const uploadDir = path.join(__dirname, '../uploads/original/cache');
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        await fsp.mkdir(uploadDir, { recursive: true });
 
         const newPhysicalPath = path.join(uploadDir, fileName);
-        fs.copyFileSync(normalizedPath, newPhysicalPath);
+        await fsp.copyFile(normalizedPath, newPhysicalPath);
 
         const cachedPdf = await prisma.pdfCache.create({
             data: {
@@ -728,19 +657,19 @@ const saveGeneratedPdfState = async (req, res) => {
         const timestamp = Date.now();
         const editedFileName = `edited_${timestamp}_${pdf.FileName}`;
         const editedDir = path.join(__dirname, '../uploads/edited/cache');
-        if (!fs.existsSync(editedDir)) fs.mkdirSync(editedDir, { recursive: true });
+        await fsp.mkdir(editedDir, { recursive: true });
         const newEditedPath = `/uploads/edited/cache/${editedFileName}`;
         const absoluteNewEdited = path.join(editedDir, editedFileName);
 
-        fs.copyFileSync(req.file.path, absoluteNewEdited);
-        fs.unlinkSync(req.file.path);
+        await fsp.copyFile(req.file.path, absoluteNewEdited);
+        await fsp.unlink(req.file.path);
 
 
         if (pdf.EditedFile && pdf.EditedFilePath) {
             const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
-            if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
+            if (oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
                 try {
-                    fs.unlinkSync(oldPath);
+                    await fsp.unlink(oldPath);
                 } catch (e) { }
             }
         }
@@ -768,9 +697,11 @@ const cleanupTempFile = async (req, res) => {
             const cleanTempPath = pdf.TempFilePath.replace(/^\//, '');
             const absoluteTemp = path.join(__dirname, '..', cleanTempPath);
 
-            if (fs.existsSync(absoluteTemp)) {
-                fs.unlinkSync(absoluteTemp);
-                console.log(`[cleanupTempFile] ลบไฟล์ Temp ทิ้งเรียบร้อย: ${absoluteTemp}`);
+            try {
+                await fsp.unlink(absoluteTemp);
+                logger.info(`[cleanupTempFile] ลบไฟล์ Temp ทิ้งเรียบร้อย: ${absoluteTemp}`);
+            } catch (e) {
+                if (e.code !== 'ENOENT') logger.warn(`[cleanupTempFile] Error deleting: ${e.message}`);
             }
 
             await prisma.pdfCache.update({
@@ -781,7 +712,7 @@ const cleanupTempFile = async (req, res) => {
 
         res.json({ message: 'ลบไฟล์ Temp ออกจากระบบสำเร็จ' });
     } catch (error) {
-        console.error('[cleanupTempFile] Error:', error);
+        logger.error('[cleanupTempFile] Error:', error);
         res.status(500).json({ error: 'ไม่สามารถลบไฟล์ Temp ได้' });
     }
 };
@@ -818,7 +749,6 @@ const getStampMetadata = async (req, res) => {
                         nextSeqNoValue = `${lastNum + 1}/${currentYearBE}`;
                     }
                 } else {
-                    // Fallback for old numeric format
                     const lastNum = parseInt(lastStamp.seqNo, 10);
                     if (!isNaN(lastNum)) {
                         nextSeqNoValue = `${lastNum + 1}/${currentYearBE}`;
@@ -877,7 +807,7 @@ module.exports = {
     checkPdfType,
     generatePDF,
     importPdfUrl,
-    autoImportUniversal,
+    autoImportUniversal: importPdfUrl, // backward compat alias
     deletePdf,
     uploadPdf,
     getPdfById,

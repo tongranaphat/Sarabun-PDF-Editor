@@ -1,28 +1,14 @@
-const logger = {
-    info: (message, ...args) => {
-        console.log(`[ERROR_HANDLER] ${new Date().toISOString()} - ${message}`, ...args);
-    },
-    error: (message, error) => {
-        console.error(`[ERROR_HANDLER] ${new Date().toISOString()} - ${message}`);
-        if (error) {
-            console.error('Error details:', error.message || error);
-            if (error.stack) {
-                console.error('Stack trace:', error.stack);
-            }
-        }
-    },
-    warn: (message, ...args) => {
-        console.warn(`[ERROR_HANDLER] ${new Date().toISOString()} - ${message}`, ...args);
-    }
-};
+const logger = require('./logger');
 
+/**
+ * Custom error classes for structured error handling.
+ */
 class AppError extends Error {
     constructor(message, statusCode = 500, isOperational = true) {
         super(message);
         this.statusCode = statusCode;
         this.isOperational = isOperational;
         this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-
         Error.captureStackTrace(this, this.constructor);
     }
 }
@@ -45,12 +31,19 @@ class DatabaseError extends AppError {
     }
 }
 
+/**
+ * Wraps async route handlers to catch unhandled rejections
+ * and forward them to Express error middleware.
+ */
 const asyncHandler = (fn) => {
     return (req, res, next) => {
         Promise.resolve(fn(req, res, next)).catch(next);
     };
 };
 
+/**
+ * Zod/Joi validation middleware factory.
+ */
 const validateRequest = (schema) => {
     return (req, res, next) => {
         const { error } = schema.validate(req.body);
@@ -63,77 +56,93 @@ const validateRequest = (schema) => {
     };
 };
 
+/**
+ * Converts Prisma-specific error codes to structured AppError instances.
+ */
 const handlePrismaError = (error) => {
     logger.error('Prisma error:', error);
 
     switch (error.code) {
         case 'P2002':
-            return new AppError('Unique constraint violation', 409);
+            return new AppError('Unique constraint violation: ข้อมูลซ้ำในระบบ', 409);
         case 'P2025':
             return new NotFoundError('Record');
         case 'P2003':
-            return new AppError('Foreign key constraint violation', 400);
+            return new AppError('Foreign key constraint violation: ข้อมูลที่อ้างอิงไม่มีอยู่', 400);
         case 'P2014':
-            return new AppError('Invalid relation', 400);
+            return new AppError('Invalid relation: ความสัมพันธ์ข้อมูลไม่ถูกต้อง', 400);
+        case 'P2024':
+            return new DatabaseError('Connection pool timeout — ลองอีกครั้ง');
         default:
             return new DatabaseError(error.message);
     }
 };
 
-const sendErrorDev = (err, res) => {
+/**
+ * Development error response — includes stack trace.
+ */
+const sendErrorDev = (err, req, res) => {
     res.status(err.statusCode).json({
         status: err.status,
-        error: err,
-        message: err.message,
-        stack: err.stack
+        error: err.message,
+        code: err.code || undefined,
+        stack: err.stack,
+        path: req.originalUrl
     });
 };
 
-const sendErrorProd = (err, res) => {
+/**
+ * Production error response — hides internals for non-operational errors.
+ */
+const sendErrorProd = (err, req, res) => {
     if (err.isOperational) {
         res.status(err.statusCode).json({
             status: err.status,
-            message: err.message
+            error: err.message
         });
     } else {
-        logger.error('Programming error:', err);
+        logger.error(`Unexpected error on ${req.method} ${req.originalUrl}:`, err);
         res.status(500).json({
             status: 'error',
-            message: 'Something went wrong!'
+            error: 'เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่'
         });
     }
 };
 
+/**
+ * Global Express error handler — single source of truth.
+ * Replaces both errorMiddleware.js and the old globalErrorHandler.
+ */
 const globalErrorHandler = (err, req, res, next) => {
     err.statusCode = err.statusCode || 500;
     err.status = err.status || 'error';
 
-    if (err.code && err.code.startsWith('P')) {
+    if (err.code && typeof err.code === 'string' && err.code.startsWith('P')) {
         err = handlePrismaError(err);
     }
 
-    if (err.name === 'ValidationError') {
+    if (err.name === 'ValidationError' && !(err instanceof AppError)) {
         err = new ValidationError(err.message);
     }
 
-    if (err.name === 'JsonWebTokenError') {
-        err = new AppError('Invalid token', 401);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        err = new AppError('ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 50MB)', 413);
     }
 
-    if (err.name === 'TokenExpiredError') {
-        err = new AppError('Token expired', 401);
-    }
+    logger.error(`${req.method} ${req.originalUrl} → ${err.statusCode}`, err);
 
-    if (process.env.NODE_ENV === 'development') {
-        sendErrorDev(err, res);
+    if (process.env.NODE_ENV === 'production') {
+        sendErrorProd(err, req, res);
     } else {
-        sendErrorProd(err, res);
+        sendErrorDev(err, req, res);
     }
 };
 
+/**
+ * 404 catch-all for undefined routes.
+ */
 const notFound = (req, res, next) => {
-    const err = new NotFoundError(`Route ${req.originalUrl}`);
-    next(err);
+    next(new NotFoundError(`Route ${req.originalUrl}`));
 };
 
 module.exports = {
@@ -145,5 +154,5 @@ module.exports = {
     validateRequest,
     globalErrorHandler,
     notFound,
-    logger
+    handlePrismaError
 };

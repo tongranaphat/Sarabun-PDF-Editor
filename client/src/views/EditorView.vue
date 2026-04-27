@@ -6,8 +6,8 @@
 
     <Sidebar :isOpen="isSidebarOpen" :isCanvasReady="isCanvasReady" :pages="pages" :currentPageIndex="currentPageIndex"
       :pdfId="currentPdfId" @toggle="toggleSidebar" @open="isSidebarOpen = true" @close="isSidebarOpen = false"
-      @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper" @delete-page="deletePage"
-      @page-click="scrollToPage" @page-drop="handlePageDrop" @add-signature-block="handleAddSignatureBlock"
+      @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper" @delete-page="handleDeletePage"
+      @page-click="handleScrollToPage" @page-drop="handlePageDropWrapper" @add-signature-block="handleAddSignatureBlock"
       @add-custom-variable="() => { }" @refresh-stamp="handleRefreshStamp" />
 
     <main class="viewport" :class="{ 'full-width': !isSidebarOpen }" ref="viewportRef">
@@ -25,8 +25,6 @@
 
     <div v-if="canvas" class="floating-panel-anchor" :class="{ 'sidebar-closed': !isSidebarOpen }">
       <PropertiesPanel :canvas="canvas" />
-
-
     </div>
 
     <ExportOverlay :visible="exportOverlay.visible" :title="exportOverlay.title" :current="exportOverlay.current"
@@ -51,12 +49,14 @@ import ExportOverlay from '../components/ExportOverlay.vue';
 import SignatureModal from '../components/SignatureModal.vue';
 import FileNameModal from '../components/FileNameModal.vue';
 
-
 import { useCanvas } from '../composables/useCanvas';
 import { useDocument } from '../composables/useDocument';
 import { useCanvasEvents } from '../composables/useCanvasEvents';
-
 import { useEditablePdf } from '../composables/useEditablePdf';
+import { usePageManager } from '../composables/usePageManager';
+import { useExportPdf } from '../composables/useExportPdf';
+import { useStampAutoAdd } from '../composables/useStampAutoAdd';
+import { useRouteHandler } from '../composables/useRouteHandler';
 import { useEditorStore } from '../stores/editorStore';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 import { showNotification } from '../utils/notifications';
@@ -68,27 +68,15 @@ const currentPdfId = computed(() => {
   return parts[parts.length - 1];
 });
 
-const canvasBaseDimensions = ref({
-  width: CANVAS_CONSTANTS.PAGE_WIDTH,
-  height: CANVAS_CONSTANTS.PAGE_HEIGHT
-});
+const canvasBaseDimensions = ref({ width: CANVAS_CONSTANTS.PAGE_WIDTH, height: CANVAS_CONSTANTS.PAGE_HEIGHT });
 const isGenerating = ref(false);
 const pdfQuality = ref(2);
-let isRendering = false;
-
+const isCanvasReady = ref(false);
+const isDocumentLoading = ref(true);
 const PAGE_WIDTH_CONST = CANVAS_CONSTANTS.PAGE_WIDTH;
 const PAGE_HEIGHT_CONST = CANVAS_CONSTANTS.PAGE_HEIGHT;
 
-let isCanvasReady = ref(false);
-const isDocumentLoading = ref(true);
-
-const exportOverlay = ref({
-  visible: false,
-  title: '',
-  current: 0,
-  total: 1,
-  stage: ''
-});
+const exportOverlay = ref({ visible: false, title: '', current: 0, total: 1, stage: '' });
 const showExportOverlay = (title, total = 1) => {
   exportOverlay.value = { visible: true, title, current: 0, total, stage: '' };
 };
@@ -96,774 +84,64 @@ const updateExportProgress = (current, stage = '') => {
   exportOverlay.value.current = current;
   if (stage) exportOverlay.value.stage = stage;
 };
-const hideExportOverlay = () => {
-  exportOverlay.value.visible = false;
-};
+const hideExportOverlay = () => { exportOverlay.value.visible = false; };
 
-let _wheelHandler = null;
-let _scrollHandler = null;
-let _keydownHandler = null;
-
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
-
-const signatureModal = ref({
-  visible: false,
-  data: null
-});
-
-const fileNameModal = ref({
-  visible: false,
-  defaultName: ''
-});
+const signatureModal = ref({ visible: false, data: null });
+const fileNameModal = ref({ visible: false, defaultName: '' });
 let fileNameResolver = null;
 
 const promptFileName = (defaultName) => {
-  fileNameModal.value = {
-    visible: true,
-    defaultName
-  };
-  return new Promise((resolve) => {
-    fileNameResolver = resolve;
-  });
+  fileNameModal.value = { visible: true, defaultName };
+  return new Promise((resolve) => { fileNameResolver = resolve; });
 };
+const handleFileNameConfirm = (name) => { fileNameModal.value.visible = false; if (fileNameResolver) fileNameResolver(name); };
+const handleFileNameCancel = () => { fileNameModal.value.visible = false; if (fileNameResolver) fileNameResolver(null); };
 
-const handleFileNameConfirm = (name) => {
-  fileNameModal.value.visible = false;
-  if (fileNameResolver) fileNameResolver(name);
-};
-
-const handleFileNameCancel = () => {
-  fileNameModal.value.visible = false;
-  if (fileNameResolver) fileNameResolver(null);
-};
-
-
-let activePdfId = null;
-
-const triggerTempCleanup = () => {
-  const idToClean = activePdfId || (currentPdfId.value !== 'pdf' ? currentPdfId.value : null);
-
-  if (idToClean && idToClean !== 'pdf') {
-    const cleanupUrl = `${apiService.getBackendBase()}/api/pdf/cleanup-temp/${idToClean}`;
-
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(cleanupUrl);
-    } else {
-      fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => { });
-    }
-
-    activePdfId = null;
-  }
-};
-
-const handleUrlImport = async (url) => {
-  if (!url) return;
-  isDocumentLoading.value = true;
-  try {
-    showNotification('กำลังดาวน์โหลดไฟล์จากลิงก์...', 'info');
-
-    const data = await apiService.importPdfFromUrl(url);
-    const newPdfId = data.OriginalFileId || data.id;
-
-    if (!newPdfId) {
-      throw new Error('ไม่ได้รับ File ID จาก Server');
-    }
-
-    const workspaceData = await apiService.prepareWorkspace(newPdfId);
-    await resetCanvas();
-
-    if (workspaceData.editState) {
-      let parsedState = workspaceData.editState;
-      while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
-      pages.value = parsedState;
-      autoFitZoom();
-    } else {
-      const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-      const downloadedFile = new File([blobData], 'imported_from_url.pdf', {
-        type: 'application/pdf'
-      });
-      const images = await processPdfToImages(downloadedFile);
-      if (images.length > 0) {
-        pages.value = images.map((imgObj, idx) => ({
-          id: Date.now() + idx,
-          background: imgObj.dataUrl,
-          width: imgObj.width,
-          height: imgObj.height,
-          objects: [],
-          originalBackgroundType: 'PDF'
-        }));
-        autoFitZoom();
-      }
-    }
-
-    currentPageIndex.value = 0;
-    documentTitle.value =
-      url
-        .split('/')
-        .pop()
-        ?.replace(/\.pdf$/i, '') || 'imported';
-
-    window.history.pushState({}, '', `/pdf/${newPdfId}`);
-
-    await nextTick();
-    await renderAllPages();
-
-    if (!workspaceData.editState) {
-      try {
-        const stampMeta = await apiService.getStampMetadata(newPdfId);
-        if (addStampBlockToCanvas) {
-          addStampBlockToCanvas(stampMeta);
-          setTimeout(async () => {
-            try {
-              const pagesData = preparePagesForSave();
-              const formData = new FormData();
-              formData.append('OriginalFileId', newPdfId);
-              formData.append('editState', JSON.stringify(pagesData));
-              await apiService.savePdfState(formData);
-            } catch (err) {
-              console.error('Failed to auto-save stamp block', err);
-            }
-          }, 500);
-        }
-      } catch (e) {
-        console.warn('Failed to add auto stamp', e);
-      }
-    }
-
-    showNotification('นำเข้าไฟล์สำเร็จ!', 'success');
-  } catch (error) {
-    console.error('URL Import Error:', error);
-    alert('ไม่สามารถดาวน์โหลด PDF จาก URL นี้ได้: ' + error.message);
-  } finally {
-    isDocumentLoading.value = false;
-  }
-};
+const toggleSidebar = () => { isSidebarOpen.value = !isSidebarOpen.value; };
 
 const {
-  canvas,
-  zoomLevel,
-  viewportRef,
-  initCanvas,
-  zoomIn,
-  zoomOut,
-  fitToScreen,
-  removeSelectedObject,
-  setHistoryLock,
-  saveHistory,
-  resetHistory,
-  undo,
-  redo,
-
-  addSignatureBlockToCanvas,
-  addStampBlockToCanvas,
-  setHistoryContext,
-  isRemoteUpdating,
-  updateCanvasDimensions,
-  relinkSignatures,
-  setCallbacks: setCanvasCallbacks,
-  dispose: disposeCanvas
+  canvas, zoomLevel, viewportRef, initCanvas,
+  zoomIn, zoomOut, fitToScreen, removeSelectedObject,
+  setHistoryLock, saveHistory, resetHistory, undo, redo,
+  addSignatureBlockToCanvas, addStampBlockToCanvas,
+  setHistoryContext, isRemoteUpdating, updateCanvasDimensions,
+  relinkSignatures, setCallbacks: setCanvasCallbacks, dispose: disposeCanvas
 } = useCanvas();
-
-
 
 const canvasHelpers = { resetHistory, saveHistory, setHistoryLock, addStampBlockToCanvas };
 
 const {
-  documentTitle,
-  currentDocumentId,
-  currentReportId,
-  pages,
-  currentPageIndex,
-  isSidebarOpen,
-  isPagesSidebarOpen,
-  currentFileHandle,
-
-  saveReport,
-  resetCanvas,
-  getDefaultPageImage,
-  cleanFabricObject,
-  preparePagesForSave,
-  sanitizePagesData,
-  handleUnifiedImport,
-  processPdfToImages,
-  saveFileWithFallback,
-  setDocumentCallbacks,
-  autoFitZoom
+  documentTitle, currentDocumentId, currentReportId,
+  pages, currentPageIndex, isSidebarOpen, isPagesSidebarOpen,
+  currentFileHandle, saveReport, resetCanvas, getDefaultPageImage,
+  cleanFabricObject, preparePagesForSave, sanitizePagesData,
+  handleUnifiedImport, processPdfToImages, saveFileWithFallback,
+  setDocumentCallbacks, autoFitZoom
 } = useDocument(canvas, zoomLevel, canvasHelpers);
 
 if (setHistoryContext) setHistoryContext(pages, currentPageIndex);
 
-
-const { initCanvasEvents, updateObjectClipPath } = useCanvasEvents(
-  canvas,
-  pages,
-  currentPageIndex,
-  saveHistory
-);
+const { initCanvasEvents, updateObjectClipPath } = useCanvasEvents(canvas, pages, currentPageIndex, saveHistory);
 const { generateHybridPdfBlob, captureCanvasPageSafe } = useEditablePdf();
+
+const pageManager = usePageManager(canvas, pages, currentPageIndex, zoomLevel, canvasBaseDimensions);
+const { captureAllPages, buildExportProjectData, fetchVariableMap, restoreCanvasAfterCapture } = useExportPdf();
+const { autoAddStamp, hasStampInState } = useStampAutoAdd();
 
 const editorStore = useEditorStore();
 
-watch(zoomLevel, async (newZoom, oldZoom) => {
-  if (canvas.value && canvasBaseDimensions.value && viewportRef.value) {
-    const viewport = viewportRef.value;
-    const oldScrollLeft = viewport.scrollLeft;
-    const oldScrollTop = viewport.scrollTop;
-    const viewWidth = viewport.clientWidth;
-    const viewHeight = viewport.clientHeight;
-
-    const centerX = (oldScrollLeft + viewWidth / 2) / oldZoom;
-    const centerY = (oldScrollTop + viewHeight / 2) / oldZoom;
-
-    canvas.value.setDimensions({
-      width: canvasBaseDimensions.value.width * newZoom,
-      height: canvasBaseDimensions.value.height * newZoom
-    });
-    canvas.value.setZoom(newZoom);
-    canvas.value.requestRenderAll();
-
-    await nextTick();
-
-    viewport.scrollLeft = centerX * newZoom - viewWidth / 2;
-    viewport.scrollTop = centerY * newZoom - viewHeight / 2;
-  }
+const renderDeps = () => ({
+  setHistoryLock,
+  cleanFabricObject,
+  updateObjectClipPath,
+  saveHistory
 });
 
-const handleReset = async () => {
-  const fileIdToReset = window.location.pathname.split('/').pop();
-
-  if (!fileIdToReset || fileIdToReset === 'pdf') {
-    showNotification('ไม่พบ ID สำหรับการรีเซ็ต', 'error');
-    return;
-  }
-
-  const confirmed = confirm('ข้อมูลทั้งหมดที่เคยแก้ไขจะหายไปทั้งหมด แน่ใจหรือไม่?');
-
-  if (confirmed) {
-    try {
-      showNotification('กำลังรีเซ็ตข้อมูล...', 'info');
-      await apiService.resetToOriginal(fileIdToReset);
-      alert('รีเซ็ตสำเร็จ! ระบบกำลังโหลดไฟล์ต้นฉบับใหม่...');
-      window.location.reload();
-    } catch (error) {
-      console.error('Reset failed:', error);
-      const errorMsg = error.response?.data?.error || 'เกิดข้อผิดพลาดในการรีเซ็ตข้อมูล';
-      alert(`${errorMsg}`);
-      showNotification('รีเซ็ตไม่สำเร็จ', 'error');
-    }
-  }
+const renderAllPages = async (options = {}) => {
+  await pageManager.renderAllPages(options, renderDeps());
 };
 
-const getWorkspaceMaxWidth = () => {
-  let globalMaxWidth = 0;
-  (pages.value || []).forEach((p) => {
-    const w = Number(p.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-    if (w > globalMaxWidth) globalMaxWidth = w;
-  });
-  return globalMaxWidth;
-};
-
-const getPageLeftOffset = (pWidth) => {
-  return (getWorkspaceMaxWidth() - (Number(pWidth) || CANVAS_CONSTANTS.PAGE_WIDTH)) / 2;
-};
-
-const getPageTopOffset = (index) => {
-  let offset = 0;
-  for (let i = 0; i < index; i++) {
-    const p = pages.value[i] || {};
-    offset += (Number(p.height) || CANVAS_CONSTANTS.PAGE_HEIGHT) + CANVAS_CONSTANTS.PAGE_GAP;
-  }
-  return offset;
-};
-
-const getPageIndexFromTop = (y) => {
-  let offset = 0;
-  for (let i = 0; i < pages.value.length; i++) {
-    const p = pages.value[i] || {};
-    const h = Number(p.height) || CANVAS_CONSTANTS.PAGE_HEIGHT;
-    if (y >= offset && y < offset + h + CANVAS_CONSTANTS.PAGE_GAP) return i;
-    offset += h + CANVAS_CONSTANTS.PAGE_GAP;
-  }
-  return Math.max(0, pages.value.length - 1);
-};
-
-const handleSaveProject = async (isSilent = false) => {
-  if (!canvas.value) return;
-
-  const pathSegments = window.location.pathname.split('/');
-  const fileIdToSave = pathSegments[pathSegments.length - 1];
-
-  if (!fileIdToSave || fileIdToSave === 'undefined' || fileIdToSave === 'pdf') {
-    if (!isSilent) showNotification('ไม่พบ ID ของไฟล์ในระบบ (Cannot find OriginalFileId)', 'error');
-    return;
-  }
-
-  try {
-    if (!isSilent) {
-      showExportOverlay('กำลังบันทึกไฟล์...', pages.value.length + 2);
-      updateExportProgress(0, 'กำลังเตรียมข้อมูล...');
-    }
-
-    saveCurrentPageState();
-
-    const pagesData = preparePagesForSave();
-    const projectData = {
-      name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ',
-      pages: pagesData,
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      type: 'hybrid-project'
-    };
-
-    const variableMap = {};
-    try {
-      const realData = await apiService.getVariables();
-      if (Array.isArray(realData)) {
-        realData.forEach((item) => {
-          if (item.key) variableMap[item.key] = item.value || '';
-        });
-      }
-    } catch (error) {
-      if (variables.value) {
-        variables.value.forEach((v) => {
-          if (v.key) variableMap[v.key] = v.value || `{{${v.key}}}`;
-        });
-      }
-    }
-
-    const canvasImages = [];
-    const P_H = CANVAS_CONSTANTS.PAGE_HEIGHT;
-    const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-    const qualityMultiplier = Number(pdfQuality.value) || 2;
-    const TEXT_TYPES = ['textbox', 'text', 'i-text'];
-    const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
-
-    const originalPage = currentPageIndex.value;
-
-    try {
-      canvas.value.requestRenderAll();
-      await renderAllPages();
-      await nextTick();
-      await nextTick();
-
-      for (let i = 0; i < pages.value.length; i++) {
-        const allObjects = canvas.value.getObjects();
-        const hiddenForCapture = [];
-
-        allObjects.forEach((obj) => {
-          const center = obj.getCenterPoint();
-          const objPageIndex = getPageIndexFromTop(center.y);
-          const isWrongPage = objPageIndex !== i;
-          const isBackground = obj.id === 'page-bg-image' || obj.id === 'page-bg';
-          const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
-          const isOverlay = OVERLAY_TYPES.includes(obj.type) && !isBackground;
-
-          let shouldHide = false;
-          const pdfMode = 'flatten';
-          if (pdfMode === 'flatten') shouldHide = isWrongPage;
-          else shouldHide = isWrongPage || isOverlay;
-
-          if (shouldHide && obj.visible) {
-            obj.visible = false;
-            hiddenForCapture.push(obj);
-          }
-        });
-
-        canvas.value.renderAll();
-        const topOffset = getPageTopOffset(i);
-        const pageData = pages.value[i] || {};
-        const pWidth = Number(pageData.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-        const pHeight = Number(pageData.height) || CANVAS_CONSTANTS.PAGE_HEIGHT;
-        const offsetLeftCanvas = getPageLeftOffset(pWidth);
-
-        const imgDataUrl = await captureCanvasPageSafe(
-          canvas.value,
-          offsetLeftCanvas,
-          topOffset,
-          pWidth,
-          pHeight,
-          qualityMultiplier
-        );
-
-        if (imgDataUrl) {
-          canvasImages.push(imgDataUrl);
-        } else {
-          console.warn(`Fallback for bounding page ${i + 1}`);
-          const fallbackCanvas = document.createElement('canvas');
-          fallbackCanvas.width = pWidth * qualityMultiplier;
-          fallbackCanvas.height = pHeight * qualityMultiplier;
-          const fallbackCtx = fallbackCanvas.getContext('2d');
-          fallbackCtx.fillStyle = '#ffffff';
-          fallbackCtx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
-          canvasImages.push(fallbackCanvas.toDataURL('image/jpeg', 0.92));
-        }
-        hiddenForCapture.forEach((obj) => {
-          obj.visible = true;
-        });
-
-        if (!isSilent) updateExportProgress(i + 1, `กำลังประมวลผลหน้า ${i + 1} / ${pages.value.length}`);
-
-        await yieldToMain();
-      }
-      canvas.value.requestRenderAll();
-
-      if (canvasImages.length === 0) throw new Error('ไม่สามารถประมวลผลหน้ากระดาษเป็นรูปภาพได้');
-
-      const exportProjectData = JSON.parse(JSON.stringify(projectData));
-      const liveObjects = canvas.value.getObjects();
-
-      exportProjectData.pages.forEach((page, pageIndex) => {
-        if (page.objects) {
-          page.objects.forEach((jsonObj) => {
-            if (['textbox', 'text', 'i-text'].includes(jsonObj.type)) {
-              const liveObj = liveObjects.find((o) => {
-                if (o.id && jsonObj.id && o.id === jsonObj.id) return true;
-                const expectedTop = jsonObj.top + getPageTopOffset(pageIndex);
-                return Math.abs(o.left - jsonObj.left) < 5 && Math.abs(o.top - expectedTop) < 5;
-              });
-              if (liveObj) {
-                if (liveObj.textLines && liveObj.textLines.length > 0) {
-                  const cleanLines = liveObj.textLines.map((line) =>
-                    (typeof line === 'string' ? line : '').replace(/\u200B/g, '').trimEnd()
-                  );
-                  jsonObj.text = cleanLines.join('\n');
-                } else if (liveObj.text) {
-                  jsonObj.text = liveObj.text.replace(/\u200B/g, '');
-                }
-              }
-              if (jsonObj.text) jsonObj.text = jsonObj.text.replace(/\u200B/g, '');
-            }
-          });
-        }
-      });
-
-      if (!isSilent) updateExportProgress(pages.value.length + 1, 'กำลังสร้าง PDF...');
-
-      await yieldToMain();
-
-      const pdfBlob = await generateHybridPdfBlob(
-        canvasImages,
-        exportProjectData,
-        variableMap,
-        null,
-        'report',
-        'flatten'
-      );
-
-      if (!isSilent) updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไปยังเซิร์ฟเวอร์...');
-
-      await yieldToMain();
-
-      const formData = new FormData();
-      formData.append('OriginalFileId', fileIdToSave);
-      formData.append('editState', JSON.stringify(pages.value));
-      formData.append('pdfFile', pdfBlob, `edited_${fileIdToSave}.pdf`);
-
-      const savedData = await apiService.savePdfState(formData);
-
-      if (savedData) {
-        if (!isSilent) showNotification('บันทึกไฟล์เรียบร้อย!', 'success');
-
-        console.log('Database state saved/updated successfully!');
-
-        try {
-          const historyPayload = {
-            name: documentTitle.value || 'ไฟล์ที่บันทึกแล้ว',
-            pages: pages.value,
-            data: JSON.stringify(pages.value),
-            pdfUrl: savedData.filepath || null,
-            documentId: currentDocumentId.value || null
-          };
-        } catch (err) {
-          console.error('Failed to log database save to history', err);
-        }
-      }
-
-      saveHistory();
-    } finally {
-      if (canvas.value) {
-        canvas.value.selection = true;
-        canvas.value.getObjects().forEach((obj) => {
-          if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-            obj.set({ selectable: true, evented: true, visible: true });
-            const TEXT_TYPES = ['textbox', 'text', 'i-text'];
-            if (TEXT_TYPES.includes(obj.type)) obj.set('editable', true);
-          }
-        });
-        canvas.value.renderAll();
-      }
-
-      loadPageToCanvas(originalPage);
-    }
-  } catch (e) {
-    console.error('Save Project failed:', e);
-    if (!isSilent) showNotification('เกิดข้อผิดพลาดในการบันทึกไฟล์: ' + e.message, 'error');
-  } finally {
-    if (!isSilent) hideExportOverlay();
-  }
-};
-
-
-const handleRefreshStamp = async () => {
-  if (!currentPdfId.value || !canvas.value) return;
-  try {
-    const stampMeta = await apiService.getStampMetadata(currentPdfId.value);
-
-    const objects = canvas.value.getObjects();
-    const existingStamp = objects.find((obj) => obj.name === 'บล็อกเลขที่รับ');
-
-    let oldLeft = null;
-    let oldTop = null;
-
-    if (existingStamp) {
-      oldLeft = existingStamp.left;
-      oldTop = existingStamp.top;
-      canvas.value.remove(existingStamp);
-    }
-
-    if (addStampBlockToCanvas) {
-      addStampBlockToCanvas(stampMeta, oldLeft, oldTop);
-
-      setTimeout(async () => {
-        try {
-          await handleSaveProject(true);
-        } catch (err) {
-          console.error('Silent auto-save failed after stamp refresh', err);
-        }
-      }, 500);
-    }
-  } catch (error) {
-    console.error('Failed to refresh stamp:', error);
-  }
-};
-
-
-const handleExport = async () => {
-  if (!canvas.value) return;
-
-  try {
-    saveCurrentPageState();
-    const pagesData = preparePagesForSave();
-    const projectData = {
-      name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ',
-      pages: pagesData,
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      type: 'hybrid-project'
-    };
-
-    const variableMap = {};
-
-    try {
-      const realData = await apiService.getVariables();
-
-      if (Array.isArray(realData)) {
-        realData.forEach((item) => {
-          if (item.key) {
-            variableMap[item.key] = item.value || '';
-          }
-        });
-      }
-    } catch (error) {
-      console.warn('Failed to fetch live variables, using sidebar defaults:', error);
-    }
-
-    const canvasImages = [];
-    const P_H = CANVAS_CONSTANTS.PAGE_HEIGHT;
-    const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-    const qualityMultiplier = Number(pdfQuality.value) || 2;
-    const TEXT_TYPES = ['textbox', 'text', 'i-text'];
-    const OVERLAY_TYPES = ['textbox', 'text', 'i-text', 'image'];
-
-    const originalPage = currentPageIndex.value;
-
-    try {
-      showExportOverlay('กำลังส่งออก PDF...', pages.value.length + 2);
-      updateExportProgress(0, 'กำลังเตรียมข้อมูล...');
-      canvas.value.requestRenderAll();
-      await renderAllPages();
-      await nextTick();
-
-      for (let i = 0; i < pages.value.length; i++) {
-        const allObjects = canvas.value.getObjects();
-        const hiddenForCapture = [];
-
-        allObjects.forEach((obj) => {
-          const center = obj.getCenterPoint();
-          const objPageIndex = getPageIndexFromTop(center.y);
-          const isWrongPage = objPageIndex !== i;
-
-          const isBackground = obj.id === 'page-bg-image' || obj.id === 'page-bg';
-          const isOverlay = OVERLAY_TYPES.includes(obj.type) && !isBackground;
-
-          let shouldHide = false;
-          const pdfMode = 'flatten';
-          if (pdfMode === 'flatten') {
-            shouldHide = isWrongPage;
-          } else {
-            shouldHide = isWrongPage || isOverlay;
-          }
-
-          if (shouldHide && obj.visible) {
-            obj.visible = false;
-            hiddenForCapture.push(obj);
-          }
-        });
-
-        canvas.value.renderAll();
-
-        const topOffset = getPageTopOffset(i);
-        const pageData = pages.value[i] || {};
-        const pWidth = Number(pageData.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-        const pHeight = Number(pageData.height) || CANVAS_CONSTANTS.PAGE_HEIGHT;
-        const offsetLeftCanvas = getPageLeftOffset(pWidth);
-
-        const imgDataUrl = await captureCanvasPageSafe(
-          canvas.value,
-          offsetLeftCanvas,
-          topOffset,
-          pWidth,
-          pHeight,
-          qualityMultiplier
-        );
-
-        if (imgDataUrl) {
-          canvasImages.push(imgDataUrl);
-        } else {
-          console.warn(`Canvas taint/capture failure on page ${i + 1}, pushing fallback.`);
-          const fallbackCanvas = document.createElement('canvas');
-          fallbackCanvas.width = pWidth * qualityMultiplier;
-          fallbackCanvas.height = pHeight * qualityMultiplier;
-          const fallbackCtx = fallbackCanvas.getContext('2d');
-          fallbackCtx.fillStyle = '#ffffff';
-          fallbackCtx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
-          canvasImages.push(fallbackCanvas.toDataURL('image/jpeg', 0.92));
-        }
-
-        hiddenForCapture.forEach((obj) => {
-          obj.visible = true;
-        });
-
-        updateExportProgress(i + 1, `กำลังประมวลผลหน้า ${i + 1} / ${pages.value.length}`);
-        await yieldToMain();
-      }
-      canvas.value.requestRenderAll();
-
-      if (canvasImages.length === 0) throw new Error('ไม่สามารถประมวลผลหน้ากระดาษเป็นรูปภาพได้');
-
-      const exportProjectData = JSON.parse(JSON.stringify(projectData));
-      const liveObjects = canvas.value.getObjects();
-
-      exportProjectData.pages.forEach((page, pageIndex) => {
-        if (page.objects) {
-          page.objects.forEach((jsonObj) => {
-            if (['textbox', 'text', 'i-text'].includes(jsonObj.type)) {
-              const liveObj = liveObjects.find((o) => {
-                if (o.id && jsonObj.id && o.id === jsonObj.id) return true;
-                const expectedTop = jsonObj.top + getPageTopOffset(pageIndex);
-                return Math.abs(o.left - jsonObj.left) < 5 && Math.abs(o.top - expectedTop) < 5;
-              });
-
-              if (liveObj) {
-                if (liveObj.textLines && liveObj.textLines.length > 0) {
-                  const cleanLines = liveObj.textLines.map((line) => {
-                    return (typeof line === 'string' ? line : '').replace(/\u200B/g, '').trimEnd();
-                  });
-                  jsonObj.text = cleanLines.join('\n');
-                } else if (liveObj.text) {
-                  jsonObj.text = liveObj.text.replace(/\u200B/g, '');
-                }
-              }
-              if (jsonObj.text) jsonObj.text = jsonObj.text.replace(/\u200B/g, '');
-            }
-          });
-        }
-      });
-
-      updateExportProgress(pages.value.length + 1, 'กำลังสร้าง PDF...');
-      await yieldToMain();
-
-      const pdfBlob = await generateHybridPdfBlob(
-        canvasImages,
-        exportProjectData,
-        variableMap,
-        null,
-        'report',
-        'flatten'
-      );
-
-      hideExportOverlay();
-
-      updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไฟล์...');
-      await yieldToMain();
-
-      let finalFileName = documentTitle.value || 'report';
-
-      if (!window.showSaveFilePicker) {
-        const chosenName = await promptFileName(finalFileName);
-        if (chosenName === null) {
-          return;
-        }
-        finalFileName = chosenName;
-      }
-
-      const defaultFileName = `${finalFileName}.pdf`;
-      const saveResult = await saveFileWithFallback(pdfBlob, defaultFileName);
-
-      if (!saveResult.success) {
-        if (saveResult.aborted) {
-          return;
-        }
-        throw new Error('Save failed');
-      }
-
-      const newHandle = saveResult.handle;
-      if (newHandle) {
-        currentFileHandle.value = newHandle;
-      }
-
-      try {
-        const finalName = documentTitle.value || 'Untitled Report';
-
-        const historyPayload = {
-          name: finalName,
-          pages: pages.value,
-          data: JSON.stringify(pages.value),
-          pdfUrl: newHandle ? newHandle.name : defaultFileName,
-          documentId: currentDocumentId.value || null
-        };
-
-        showNotification('ส่งออก PDF สำเร็จ!', 'success');
-      } catch (e) {
-        console.error('Failed to log export history:', e);
-        showNotification('ส่งออก PDF สำเร็จ แต่บันทึกประวัติลง Database ล้มเหลว', 'warning');
-      }
-
-      saveHistory();
-    } finally {
-      if (canvas.value) {
-        canvas.value.selection = true;
-        canvas.value.getObjects().forEach((obj) => {
-          if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-            obj.set({ selectable: true, evented: true, visible: true });
-            if (TEXT_TYPES.includes(obj.type)) obj.set('editable', true);
-          }
-        });
-        canvas.value.renderAll();
-      }
-
-      loadPageToCanvas(originalPage);
-    }
-  } catch (e) {
-    console.error('Export failed:', e);
-    showNotification('Export failed: ' + e.message, 'error');
-  } finally {
-    hideExportOverlay();
-  }
-};
+const { saveCurrentPageState, getPageTopOffset, getPageLeftOffset, getPageIndexFromTop, getWorkspaceMaxWidth, forceUnlockObject } = pageManager;
 
 const resetCanvasWrapper = async () => {
   isDocumentLoading.value = true;
@@ -875,13 +153,75 @@ const resetCanvasWrapper = async () => {
   isDocumentLoading.value = false;
 };
 
+const handleRefreshStamp = async () => {
+  if (!currentPdfId.value || !canvas.value) return;
+  await autoAddStamp(
+    currentPdfId.value, addStampBlockToCanvas,
+    saveCurrentPageState, preparePagesForSave,
+    { refreshExisting: true, canvasRef: canvas }
+  );
+  setTimeout(() => handleSaveProject(true), 500);
+};
+
+const routeHandler = useRouteHandler({
+  pages, currentPageIndex, currentReportId, currentDocumentId,
+  documentTitle, isDocumentLoading, canvas,
+  addStampBlockToCanvas, resetCanvasWrapper, resetCanvas,
+  processPdfToImages, renderAllPages, autoFitZoom,
+  sanitizePagesData, resetHistory, handleRefreshStamp,
+  autoAddStamp, hasStampInState, saveCurrentPageState, preparePagesForSave
+});
+
+const triggerTempCleanup = () => {
+  const idToClean = routeHandler.getActivePdfId() || (currentPdfId.value !== 'pdf' ? currentPdfId.value : null);
+  if (idToClean && idToClean !== 'pdf') {
+    const cleanupUrl = `${apiService.getBackendBase()}/api/pdf/cleanup-temp/${idToClean}`;
+    if (navigator.sendBeacon) navigator.sendBeacon(cleanupUrl);
+    else fetch(cleanupUrl, { method: 'POST', keepalive: true }).catch(() => { });
+  }
+};
+
+watch(zoomLevel, async (newZoom, oldZoom) => {
+  if (canvas.value && canvasBaseDimensions.value && viewportRef.value) {
+    const viewport = viewportRef.value;
+    const centerX = (viewport.scrollLeft + viewport.clientWidth / 2) / oldZoom;
+    const centerY = (viewport.scrollTop + viewport.clientHeight / 2) / oldZoom;
+    canvas.value.setDimensions({
+      width: canvasBaseDimensions.value.width * newZoom,
+      height: canvasBaseDimensions.value.height * newZoom
+    });
+    canvas.value.setZoom(newZoom);
+    canvas.value.requestRenderAll();
+    await nextTick();
+    viewport.scrollLeft = centerX * newZoom - viewport.clientWidth / 2;
+    viewport.scrollTop = centerY * newZoom - viewport.clientHeight / 2;
+  }
+});
+
 const goHome = () => {
   triggerTempCleanup();
-
-  if (typeof window !== 'undefined' && window.history) {
-    window.history.pushState({}, '', '/');
-  }
+  if (typeof window !== 'undefined' && window.history) window.history.pushState({}, '', '/');
   resetCanvasWrapper();
+};
+
+const handleReset = async () => {
+  const fileIdToReset = window.location.pathname.split('/').pop();
+  if (!fileIdToReset || fileIdToReset === 'pdf') {
+    showNotification('ไม่พบ ID สำหรับการรีเซ็ต', 'error');
+    return;
+  }
+  if (confirm('ข้อมูลทั้งหมดที่เคยแก้ไขจะหายไปทั้งหมด แน่ใจหรือไม่?')) {
+    try {
+      showNotification('กำลังรีเซ็ตข้อมูล...', 'info');
+      await apiService.resetToOriginal(fileIdToReset);
+      alert('รีเซ็ตสำเร็จ! ระบบกำลังโหลดไฟล์ต้นฉบับใหม่...');
+      window.location.reload();
+    } catch (error) {
+      const errorMsg = error.response?.data?.error || 'เกิดข้อผิดพลาดในการรีเซ็ตข้อมูล';
+      alert(errorMsg);
+      showNotification('รีเซ็ตไม่สำเร็จ', 'error');
+    }
+  }
 };
 
 const handleImportWorkspaceWrapper = async () => {
@@ -893,1052 +233,195 @@ const handleImportWorkspaceWrapper = async () => {
   isDocumentLoading.value = false;
 };
 
-const handleAddSignatureBlock = (sigData) => {
-  signatureModal.value = {
-    visible: true,
-    data: sigData
-  };
-};
+const handleAddSignatureBlock = (sigData) => { signatureModal.value = { visible: true, data: sigData }; };
 
 const handleSignatureConfirm = (customText) => {
   if (!canvas.value || !signatureModal.value.data) return;
-
   const targetTop = getPageTopOffset(currentPageIndex.value) + 100;
   const targetLeft = getWorkspaceMaxWidth() / 2;
-
   addSignatureBlockToCanvas(signatureModal.value.data, targetLeft, targetTop, customText);
-
-  signatureModal.value = {
-    visible: false,
-    data: null
-  };
+  signatureModal.value = { visible: false, data: null };
 };
 
-const handleSignatureCancel = () => {
-  signatureModal.value = {
-    visible: false,
-    data: null
-  };
-};
+const handleSignatureCancel = () => { signatureModal.value = { visible: false, data: null }; };
 
-const cleanupCanvasObjects = () => {
+const handleSaveProject = async (isSilent = false) => {
   if (!canvas.value) return;
-
-  const objects = canvas.value.getObjects();
-  let cleanedCount = 0;
-
-  objects.forEach((obj) => {
-    try {
-      if (obj.clipPath) {
-        if (obj.clipPath.dispose && typeof obj.clipPath.dispose === 'function') {
-          obj.clipPath.dispose();
-        }
-        obj.clipPath = null;
-      }
-
-      if (obj.off && typeof obj.off === 'function') {
-        obj.off();
-      }
-
-      if (obj.dispose && typeof obj.dispose === 'function') {
-        obj.dispose();
-      }
-
-      cleanedCount++;
-    } catch (e) {
-      console.warn('Error cleaning up object:', e);
-    }
-  });
-
-  if (cleanedCount > 0) {
+  const pathSegments = window.location.pathname.split('/');
+  const fileIdToSave = pathSegments[pathSegments.length - 1];
+  if (!fileIdToSave || fileIdToSave === 'undefined' || fileIdToSave === 'pdf') {
+    if (!isSilent) showNotification('ไม่พบ ID ของไฟล์ในระบบ', 'error');
+    return;
   }
-};
 
-const renderAllPages = async (options = { infraOnly: false }) => {
-  if (!canvas.value) return;
-  if (isRendering) return;
-
-  isRendering = true;
-  setHistoryLock(true);
   try {
-    if (!options.infraOnly) {
-      cleanupCanvasObjects();
-      canvas.value.discardActiveObject();
-      canvas.value.clear();
-      canvas.value.setBackgroundColor(null, () => { });
-    }
+    if (!isSilent) { showExportOverlay('กำลังบันทึกไฟล์...', pages.value.length + 2); updateExportProgress(0, 'กำลังเตรียมข้อมูล...'); }
+    saveCurrentPageState();
 
-    if (!pages.value || !Array.isArray(pages.value) || pages.value.length === 0) {
-      pages.value = [{ id: 0, background: null, objects: [] }];
-    }
-    const currentPages = pages.value;
-    const actualZoom = zoomLevel.value || 1;
+    const pagesData = preparePagesForSave();
+    const projectData = { name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ', pages: pagesData, version: '1.0', timestamp: new Date().toISOString(), type: 'hybrid-project' };
+    const variableMap = await fetchVariableMap();
+    const qualityMultiplier = Number(pdfQuality.value) || 2;
+    const originalPage = currentPageIndex.value;
 
-    let currentY = 0;
-    let maxWidth = 0;
+    try {
+      canvas.value.requestRenderAll();
+      await renderAllPages();
+      await nextTick();
+      await nextTick();
 
-    for (let i = 0; i < currentPages.length; i++) {
-      const p = currentPages[i];
-      const w = Number(p.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-      if (w > maxWidth) maxWidth = w;
-    }
-
-    const objects = canvas.value.getObjects();
-    const oldBgs = objects.filter(
-      (o) => o.id === 'page-bg' || o.id === 'page-bg-image' || o.id === 'page-divider'
-    );
-    oldBgs.forEach((bg) => canvas.value.remove(bg));
-
-    for (let i = 0; i < currentPages.length; i++) {
-      const page = currentPages[i];
-      const pWidth = Number(page.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-      const pHeight = Number(page.height) || CANVAS_CONSTANTS.PAGE_HEIGHT;
-      const offsetTop = currentY;
-      const offsetLeft = getPageLeftOffset(pWidth);
-
-      const bgRect = new fabric.Rect({
-        id: 'page-bg',
-        left: offsetLeft,
-        top: offsetTop,
-        width: pWidth,
-        height: pHeight,
-        fill: '#ffffff',
-        selectable: false,
-        evented: false,
-        excludeFromExport: true
-      });
-      canvas.value.add(bgRect);
-      canvas.value.sendToBack(bgRect);
-
-      if (page.dataUrl || page.background) {
-        const urlToLoad = page.dataUrl || page.background;
-        await new Promise((resolve) => {
-          fabric.Image.fromURL(
-            urlToLoad,
-            (img) => {
-              img.set({
-                id: 'page-bg-image',
-                left: offsetLeft,
-                top: offsetTop,
-                scaleX: pWidth / img.width,
-                scaleY: pHeight / img.height,
-                selectable: false,
-                evented: false
-              });
-              canvas.value.add(img);
-              canvas.value.moveTo(img, 1);
-              resolve();
-            },
-            { crossOrigin: 'anonymous' }
-          );
-        });
-      }
-
-      if (!options.infraOnly && page.objects && page.objects.length > 0) {
-        await new Promise((resolve) => {
-          const rawObjects = JSON.parse(JSON.stringify(page.objects));
-          const objectsToLoad = rawObjects.map((obj) => cleanFabricObject(obj));
-
-          fabric.util.enlivenObjects(objectsToLoad, (objs) => {
-            const imageReloadPromises = [];
-
-            objs.forEach((obj) => {
-              if (obj.id === 'page-bg' || obj.id === 'page-bg-image') return;
-              obj.set({ top: obj.top + offsetTop, left: obj.left + offsetLeft, _pageIndex: i });
-
-              obj.clipPath = new fabric.Rect({
-                left: offsetLeft,
-                top: offsetTop,
-                width: pWidth,
-                height: pHeight,
-                fill: 'transparent',
-                stroke: null,
-                absolutePositioned: true
-              });
-
-              if (['text', 'i-text', 'textbox'].includes(obj.type)) obj.set('objectCaching', true);
-              canvas.value.add(obj);
-              forceUnlockObject(obj);
-
-              if (obj.type === 'image' && obj.getSrc && obj.getSrc().startsWith('http')) {
-                const src = obj.getSrc();
-                const p = new Promise((imgResolve) => {
-                  fabric.Image.fromURL(
-                    src,
-                    (freshImg) => {
-                      if (freshImg._element) {
-                        obj.setElement(freshImg._element);
-                        obj.dirty = true;
-                      }
-                      imgResolve();
-                    },
-                    { crossOrigin: 'anonymous' }
-                  );
-                });
-                imageReloadPromises.push(p);
-              }
-            });
-
-            Promise.all(imageReloadPromises).then(() => {
-              if (canvas.value) canvas.value.requestRenderAll();
-              resolve();
-            });
-          });
-        });
-      }
-
-      currentY += pHeight + CANVAS_CONSTANTS.PAGE_GAP;
-    }
-
-    if (options.infraOnly) {
-      const userObjs = canvas.value.getObjects().filter(
-        (o) => o.id !== 'page-bg' && o.id !== 'page-bg-image'
+      const canvasImages = await captureAllPages(
+        canvas.value, pages.value, captureCanvasPageSafe,
+        getPageTopOffset, getPageLeftOffset, getPageIndexFromTop,
+        qualityMultiplier, isSilent ? null : updateExportProgress
       );
-      userObjs.forEach((obj) => {
-        updateObjectClipPath(obj);
-      });
+
+      if (canvasImages.length === 0) throw new Error('ไม่สามารถประมวลผลหน้ากระดาษได้');
+
+      const exportProjectData = buildExportProjectData(projectData, canvas.value, getPageTopOffset);
+
+      if (!isSilent) updateExportProgress(pages.value.length + 1, 'กำลังสร้าง PDF...');
+      await yieldToMain();
+
+      const pdfBlob = await generateHybridPdfBlob(canvasImages, exportProjectData, variableMap, null, 'report', 'flatten');
+
+      if (!isSilent) updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไปยังเซิร์ฟเวอร์...');
+      await yieldToMain();
+
+      const formData = new FormData();
+      formData.append('OriginalFileId', fileIdToSave);
+      formData.append('editState', JSON.stringify(pages.value));
+      formData.append('pdfFile', pdfBlob, `edited_${fileIdToSave}.pdf`);
+      await apiService.savePdfState(formData);
+
+      if (!isSilent) showNotification('บันทึกไฟล์เรียบร้อย!', 'success');
+      saveHistory();
+    } finally {
+      restoreCanvasAfterCapture(canvas.value);
+      pageManager.loadPageToCanvas(originalPage, renderDeps());
     }
-
-    canvas.value.setWidth(maxWidth * actualZoom);
-    canvas.value.setHeight(currentY * actualZoom);
-    canvasBaseDimensions.value = { width: maxWidth, height: currentY };
-    canvas.value.setZoom(actualZoom);
-
-    canvas.value.requestRenderAll();
-    document.fonts.ready.then(() => {
-      if (canvas.value) canvas.value.requestRenderAll();
-    });
+  } catch (e) {
+    console.error('Save Project failed:', e);
+    if (!isSilent) showNotification('เกิดข้อผิดพลาดในการบันทึกไฟล์: ' + e.message, 'error');
   } finally {
-    isRendering = false;
-    setHistoryLock(false);
+    if (!isSilent) hideExportOverlay();
   }
 };
 
-const scrollToPage = (index) => {
-  if (!viewportRef.value) return;
-  const P_H = CANVAS_CONSTANTS.PAGE_HEIGHT;
-  const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-  viewportRef.value.scrollTo({
-    top: getPageTopOffset(index) * zoomLevel.value,
-    behavior: 'smooth'
-  });
-  currentPageIndex.value = index;
-};
+const handleExport = async () => {
+  if (!canvas.value) return;
+  try {
+    saveCurrentPageState();
+    const pagesData = preparePagesForSave();
+    const projectData = { name: documentTitle.value || 'โปรเจกต์ไม่มีชื่อ', pages: pagesData, version: '1.0', timestamp: new Date().toISOString(), type: 'hybrid-project' };
+    const variableMap = await fetchVariableMap();
+    const qualityMultiplier = Number(pdfQuality.value) || 2;
+    const originalPage = currentPageIndex.value;
 
-const forceUnlockObject = (obj) => {
-  if (!obj) return;
-  const isText = ['i-text', 'textbox', 'text'].includes(obj.type);
-  const isImage = obj.type === 'image';
+    try {
+      showExportOverlay('กำลังส่งออก PDF...', pages.value.length + 2);
+      updateExportProgress(0, 'กำลังเตรียมข้อมูล...');
+      canvas.value.requestRenderAll();
+      await renderAllPages();
+      await nextTick();
 
-  if (!obj._originalState) {
-    obj._originalState = {
-      selectable: obj.selectable,
-      evented: obj.evented,
-      editable: obj.editable,
-      hasControls: obj.hasControls,
-      hasBorders: obj.hasBorders
-    };
+      const canvasImages = await captureAllPages(
+        canvas.value, pages.value, captureCanvasPageSafe,
+        getPageTopOffset, getPageLeftOffset, getPageIndexFromTop,
+        qualityMultiplier, updateExportProgress
+      );
+
+      if (canvasImages.length === 0) throw new Error('ไม่สามารถประมวลผลหน้ากระดาษได้');
+
+      const exportProjectData = buildExportProjectData(projectData, canvas.value, getPageTopOffset);
+      updateExportProgress(pages.value.length + 1, 'กำลังสร้าง PDF...');
+      await yieldToMain();
+
+      const pdfBlob = await generateHybridPdfBlob(canvasImages, exportProjectData, variableMap, null, 'report', 'flatten');
+      hideExportOverlay();
+      updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไฟล์...');
+      await yieldToMain();
+
+      let finalFileName = documentTitle.value || 'report';
+      if (!window.showSaveFilePicker) {
+        const chosenName = await promptFileName(finalFileName);
+        if (chosenName === null) return;
+        finalFileName = chosenName;
+      }
+
+      const saveResult = await saveFileWithFallback(pdfBlob, `${finalFileName}.pdf`);
+      if (!saveResult.success) {
+        if (saveResult.aborted) return;
+        throw new Error('Save failed');
+      }
+      if (saveResult.handle) currentFileHandle.value = saveResult.handle;
+      showNotification('ส่งออก PDF สำเร็จ!', 'success');
+      saveHistory();
+    } finally {
+      restoreCanvasAfterCapture(canvas.value);
+      pageManager.loadPageToCanvas(originalPage, renderDeps());
+    }
+  } catch (e) {
+    console.error('Export failed:', e);
+    showNotification('Export failed: ' + e.message, 'error');
+  } finally {
+    hideExportOverlay();
   }
-
-  obj.set({
-    selectable: true,
-    evented: true,
-    hasControls: true,
-    hasBorders: true,
-    padding: 5,
-    lockMovementX: false,
-    lockMovementY: false,
-    lockRotation: false,
-    lockScalingX: false,
-    lockScalingY: false,
-    lockUniScaling: false
-  });
-
-  obj.setControlsVisibility({
-    mt: isImage,
-    mb: isImage,
-    ml: true,
-    mr: true,
-    tl: true,
-    tr: true,
-    bl: true,
-    br: true,
-    mtr: true
-  });
-
-  if (isText) obj.set('editable', true);
-  obj.setCoords();
 };
+
+const handleScrollToPage = (index) => pageManager.scrollToPage(viewportRef, index);
+const handleDeletePage = (index) => pageManager.deletePage(index, renderDeps());
+const handlePageDropWrapper = (payload) => pageManager.handlePageDrop(payload, renderDeps());
 
 const addCustomTextToCanvas = (x, y) => {
   if (!canvas.value) return;
-
-  if (x === undefined || y === undefined) {
-    let accumulatedTop = 0;
-    for (let i = 0; i < currentPageIndex.value; i++) {
-      accumulatedTop +=
-        (pages.value[i].height || CANVAS_CONSTANTS.PAGE_HEIGHT) + CANVAS_CONSTANTS.PAGE_GAP;
-    }
-    if (y === undefined) y = accumulatedTop + 100;
-    if (x === undefined)
-      x = (pages.value[currentPageIndex.value]?.width || CANVAS_CONSTANTS.PAGE_WIDTH) / 2;
+  if (x === undefined) x = (pages.value[currentPageIndex.value]?.width || CANVAS_CONSTANTS.PAGE_WIDTH) / 2;
+  if (y === undefined) {
+    let accTop = 0;
+    for (let i = 0; i < currentPageIndex.value; i++)
+      accTop += (pages.value[i].height || CANVAS_CONSTANTS.PAGE_HEIGHT) + CANVAS_CONSTANTS.PAGE_GAP;
+    y = accTop + 100;
   }
-
   const text = new fabric.Textbox('พิมพ์ข้อความที่นี่...', {
-    id: 'custom_text_' + Date.now(),
-    left: x,
-    top: y,
-    width: 200,
-    fontFamily: 'Sarabun',
-    fontSize: 16,
-    fill: '#000000',
-    editable: true,
-    padding: 5,
-    textAlign: 'left',
-    splitByGrapheme: true,
-    objectCaching: false
+    id: 'custom_text_' + Date.now(), left: x, top: y, width: 200,
+    fontFamily: 'Sarabun', fontSize: 16, fill: '#000000', editable: true,
+    padding: 5, textAlign: 'left', splitByGrapheme: true, objectCaching: false
   });
-
-  if (typeof forceUnlockObject === 'function') {
-    forceUnlockObject(text);
-  }
-
+  forceUnlockObject(text);
   canvas.value.add(text);
   canvas.value.setActiveObject(text);
   canvas.value.requestRenderAll();
-
-  if (typeof saveCurrentPageState === 'function') {
-    saveCurrentPageState();
-  }
+  saveCurrentPageState();
 };
 
 window.addCustomTextToCanvas = addCustomTextToCanvas;
 
-let isSavingState = false;
-
-const saveCurrentPageState = () => {
-  if (!canvas.value || isSavingState || !pages.value || pages.value.length === 0) return;
-  isSavingState = true;
-  try {
-    if (
-      canvas.value.getActiveObject() &&
-      canvas.value.getActiveObject().type === 'activeSelection'
-    ) {
-      canvas.value.discardActiveObject();
-    }
-
-    const allObjects = canvas.value.getObjects();
-    const GAP = CANVAS_CONSTANTS.PAGE_GAP;
-
-    const pageObjectMap = pages.value.map(() => []);
-
-    const pageBounds = [];
-    let currentY = 0;
-    for (let i = 0; i < pages.value.length; i++) {
-      const pHeight = Number(pages.value[i].height) || CANVAS_CONSTANTS.PAGE_HEIGHT;
-      pageBounds.push({
-        top: currentY,
-        bottom: currentY + pHeight + GAP
-      });
-      currentY += pHeight + GAP;
-    }
-
-    allObjects.forEach((obj) => {
-      if (!obj || obj.id === 'page-bg' || obj.id === 'page-bg-image') return;
-      if (typeof obj.top !== 'number' || isNaN(obj.top)) return;
-
-      const center = obj.getCenterPoint();
-      const actualCenterY = center.y;
-
-      let pageIndex = 0;
-      for (let i = 0; i < pageBounds.length; i++) {
-        if (actualCenterY >= pageBounds[i].top && actualCenterY < pageBounds[i].bottom) {
-          pageIndex = i;
-          break;
-        }
-        if (i === pageBounds.length - 1 && actualCenterY >= pageBounds[i].bottom) {
-          pageIndex = i;
-        }
-      }
-
-      if (pageIndex < 0) pageIndex = 0;
-      if (pageIndex >= pages.value.length) pageIndex = pages.value.length - 1;
-
-      if (!pageBounds[pageIndex]) return;
-
-      try {
-        const serialized = obj.toObject([
-          'id',
-          'selectable',
-          'name',
-          'data',
-          'textBaseline',
-          'angle'
-        ]);
-        const pageTopY = pageBounds[pageIndex].top;
-
-        const targetPageWidth =
-          Number(pages.value[pageIndex]?.width) || CANVAS_CONSTANTS.PAGE_WIDTH;
-        const pageOffsetLeft = (getWorkspaceMaxWidth() - targetPageWidth) / 2;
-
-        serialized.left = Math.round((obj.left - pageOffsetLeft) * 100) / 100;
-        serialized.top = Math.round((obj.top - pageTopY) * 100) / 100;
-        serialized.width = Math.round((obj.width || 0) * 100) / 100;
-        serialized.height = Math.round((obj.height || 0) * 100) / 100;
-
-        if (serialized.textBaseline === 'alphabetical') serialized.textBaseline = 'alphabetic';
-        pageObjectMap[pageIndex].push(serialized);
-      } catch (e) {
-        console.error('Failed to serialize object:', e);
-      }
-    });
-
-    pages.value.forEach((p, i) => {
-      if (p) p.objects = pageObjectMap[i];
-    });
-  } finally {
-    isSavingState = false;
-  }
-};
-
-const setCanvasBackground = async (dataUrl) => {
-  if (!canvas.value) return;
-  if (pages.value[currentPageIndex.value]) {
-    pages.value[currentPageIndex.value].background = dataUrl;
-  }
-  await renderAllPages();
-};
-
-const loadPageToCanvas = async (index) => {
-  if (typeof index === 'number' && index >= 0) currentPageIndex.value = index;
-  await renderAllPages();
-};
-
-const deletePage = async (index) => {
-  if (!confirm(`Delete page ${index + 1}?`)) return;
-  pages.value.splice(index, 1);
-  pages.value.forEach((page, idx) => (page.id = idx));
-  if (currentPageIndex.value >= pages.value.length)
-    currentPageIndex.value = Math.max(0, pages.value.length - 1);
-  await nextTick();
-  await renderAllPages();
-  saveHistory();
-};
-
-const syncPagesFromCanvas = () => {
-  if (!canvas.value) return;
-
-  const objs = canvas.value.getObjects();
-  const bgRects = objs.filter(
-    (o) =>
-      o.id === 'page-bg' ||
-      (o.type === 'rect' && o.fill === '#ffffff' && !o.selectable && o.width > 300)
-  );
-
-  bgRects.sort((a, b) => a.top - b.top);
-
-  let maxWidth = 0;
-  let totalHeight = 0;
-
-  const newPages = bgRects.map((rect, index) => {
-    const bgImg = objs.find(
-      (o) =>
-        (o.id === 'page-bg-image' || (o.type === 'image' && !o.selectable)) &&
-        Math.abs(o.top - rect.top) < 10
-    );
-
-    const pWidth = rect.width || CANVAS_CONSTANTS.PAGE_WIDTH;
-    const pHeight = rect.height || CANVAS_CONSTANTS.PAGE_HEIGHT;
-
-    if (pWidth > maxWidth) maxWidth = pWidth;
-    totalHeight = Math.max(totalHeight, rect.top + pHeight);
-
-    let recoveredId = null;
-    if (rect.data && rect.data.pageId) {
-      recoveredId = rect.data.pageId;
-    } else if (pages.value[index]) {
-      recoveredId = pages.value[index].id;
-    } else {
-      recoveredId = Date.now() + index;
-    }
-
-    const existingPage = pages.value[index] || {};
-
-    return {
-      id: recoveredId,
-      background: bgImg ? bgImg.getSrc() : null,
-      width: pWidth,
-      height: pHeight,
-      objects: []
-    };
-  });
-
-  pages.value = newPages;
-
-  if (maxWidth > 0 && totalHeight > 0) {
-    const actualZoom = zoomLevel.value || 1;
-    canvas.value.setWidth(maxWidth * actualZoom);
-    canvas.value.setHeight((totalHeight + CANVAS_CONSTANTS.PAGE_GAP) * actualZoom);
-    canvasBaseDimensions.value = { width: maxWidth, height: totalHeight + CANVAS_CONSTANTS.PAGE_GAP };
-  }
-};
-
-const reapplyAllClipPaths = () => {
-  if (!canvas.value) return;
-  const objects = canvas.value.getObjects();
-  objects.forEach((obj) => {
-    if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-      updateObjectClipPath(obj);
-    }
-  });
-  canvas.value.requestRenderAll();
-};
-
-const handlePageDrop = async ({ sourceIndex, targetIndex, position }) => {
-  let insertionIndex = position === 'bottom' ? targetIndex + 1 : targetIndex;
-
-  const [movedPage] = pages.value.splice(sourceIndex, 1);
-  if (sourceIndex < insertionIndex) insertionIndex--;
-
-  pages.value.splice(insertionIndex, 0, movedPage);
-  pages.value.forEach((page, idx) => (page.id = idx));
-  await nextTick();
-  await renderAllPages();
-  saveHistory();
-};
-
 const onDrop = (e) => {
   e.preventDefault();
-
-  let x = 0;
-  let y = 0;
-
+  let x = 0, y = 0;
   if (canvas.value && typeof canvas.value.getPointer === 'function') {
     const pointer = canvas.value.getPointer(e);
-    x = pointer.x;
-    y = pointer.y;
+    x = pointer.x; y = pointer.y;
   } else {
     const canvasContainer = document.querySelector('.canvas-container');
-    const rect = canvasContainer
-      ? canvasContainer.getBoundingClientRect()
-      : e.currentTarget
-        ? e.currentTarget.getBoundingClientRect()
-        : { left: 0, top: 0 };
-    x = e.clientX - rect.left;
-    y = e.clientY - rect.top;
-    if (typeof zoomLevel !== 'undefined' && zoomLevel.value) {
-      x = x / zoomLevel.value;
-      y = y / zoomLevel.value;
-    }
+    const rect = canvasContainer ? canvasContainer.getBoundingClientRect() : (e.currentTarget?.getBoundingClientRect() || { left: 0, top: 0 });
+    x = (e.clientX - rect.left) / (zoomLevel.value || 1);
+    y = (e.clientY - rect.top) / (zoomLevel.value || 1);
   }
-
   const customText = e.dataTransfer.getData('customText');
   if (customText) addCustomTextToCanvas(x, y);
-
   const type = e.dataTransfer.getData('type');
-
   if (type === 'SIGNATURE_BLOCK') {
     const sigDataStr = e.dataTransfer.getData('sigData');
-    console.log('[EditorView] ข้อมูลที่รับมาตอน Drop:', sigDataStr);
-
     if (sigDataStr) {
       try {
-        const sigData = JSON.parse(sigDataStr);
-
-        if (typeof addSignatureBlockToCanvas === 'function') {
-          addSignatureBlockToCanvas(sigData, x, y);
-        } else if (window.addSignatureBlockToCanvas) {
-          window.addSignatureBlockToCanvas(sigData, x, y);
-        } else {
-          console.error(
-            'หาฟังก์ชัน addSignatureBlockToCanvas ไม่เจอ! ลืม Return ออกมาจาก useCanvas.js หรือเปล่า?'
-          );
-        }
-      } catch (error) {
-        console.error('เกิดข้อผิดพลาดตอนประกอบข้อมูล:', error);
-      }
+        addSignatureBlockToCanvas(JSON.parse(sigDataStr), x, y);
+      } catch (error) { console.error('Drop parse error:', error); }
     }
   }
 };
 
-const handleRouteChange = async () => {
-  isDocumentLoading.value = true;
-  try {
-    const fullHref = window.location.href;
-    const directUrlMatch = fullHref.match(/\/(https?:\/\/.+)/i) || fullHref.match(/\/(https?:\/.+)/i);
-
-    if (directUrlMatch && directUrlMatch[1]) {
-      let externalUrl = directUrlMatch[1];
-      if (externalUrl.startsWith('https:/') && !externalUrl.startsWith('https://'))
-        externalUrl = externalUrl.replace('https:/', 'https://');
-      if (externalUrl.startsWith('http:/') && !externalUrl.startsWith('http://'))
-        externalUrl = externalUrl.replace('http:/', 'http://');
-
-      try {
-        const data = await apiService.importPdfFromUrl(externalUrl);
-        const newPdfId = data.OriginalFileId || data.id || data.fileId;
-
-        if (newPdfId) {
-          window.history.replaceState({}, '', `/pdf/${newPdfId}`);
-          activePdfId = newPdfId;
-
-          const workspaceData = await apiService.prepareWorkspace(newPdfId);
-
-          if (workspaceData.editState) {
-            let parsedState = workspaceData.editState;
-            while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
-            pages.value = parsedState;
-            autoFitZoom();
-            currentPageIndex.value = 0;
-            await nextTick();
-
-            const hasStamp =
-              Array.isArray(parsedState) &&
-              parsedState.some(
-                (page) =>
-                  Array.isArray(page.objects) &&
-                  page.objects.some(
-                    (obj) =>
-                      (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-                  )
-              );
-
-            let stampMeta = null;
-            try {
-              stampMeta = await apiService.getStampMetadata(newPdfId);
-            } catch (e) {
-              console.warn('Failed to fetch stamp metadata for direct URL import', e);
-            }
-
-            await new Promise((r) =>
-              setTimeout(async () => {
-                if (typeof renderAllPages === 'function') await renderAllPages();
-                if (hasStamp) handleRefreshStamp();
-                r();
-              }, 500)
-            );
-
-            if (!hasStamp && stampMeta) {
-
-              try {
-                if (addStampBlockToCanvas) {
-                  addStampBlockToCanvas(stampMeta);
-                  setTimeout(async () => {
-                    try {
-                      saveCurrentPageState();
-                      const pagesData = preparePagesForSave();
-                      const fd = new FormData();
-                      fd.append('OriginalFileId', newPdfId);
-                      fd.append('editState', JSON.stringify(pagesData));
-                      await apiService.savePdfState(fd);
-                    } catch (err) {
-                      console.error('Auto-save stamp failed', err);
-                    }
-                  }, 500);
-                }
-              } catch (e) {
-                console.warn('Stamp add failed', e);
-              }
-            }
-          } else {
-            const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-            const downloadedFile = new File([blobData], 'url_import.pdf', {
-              type: 'application/pdf'
-            });
-
-            await resetCanvasWrapper();
-            const images = await processPdfToImages(downloadedFile);
-            if (images.length > 0) {
-              pages.value = images.map((imgObj, idx) => ({
-                id: Date.now() + idx,
-                background: imgObj.dataUrl,
-                width: imgObj.width,
-                height: imgObj.height,
-                objects: [],
-                originalBackgroundType: 'PDF'
-              }));
-              autoFitZoom();
-              currentPageIndex.value = 0;
-              await renderAllPages();
-
-              try {
-                const stampMeta = await apiService.getStampMetadata(newPdfId);
-                if (addStampBlockToCanvas) {
-                  addStampBlockToCanvas(stampMeta);
-                  setTimeout(async () => {
-                    try {
-                      saveCurrentPageState();
-                      const pagesData = preparePagesForSave();
-                      const fd = new FormData();
-                      fd.append('OriginalFileId', newPdfId);
-                      fd.append('editState', JSON.stringify(pagesData));
-                      await apiService.savePdfState(fd);
-                    } catch (err) {
-                      console.error('Auto-save stamp failed', err);
-                    }
-                  }, 500);
-                }
-              } catch (e) {
-                console.warn('Stamp add failed', e);
-              }
-            }
-          }
-          return true;
-        }
-      } catch (error) {
-        console.error('Direct URL Import Failed:', error);
-        alert('ไม่สามารถดึงไฟล์จากลิงก์ที่ระบุได้ (นำเข้าไม่สำเร็จ)');
-      }
-    }
-
-    const decodedPath = decodeURIComponent(window.location.pathname);
-    const localPathMatch = decodedPath.match(/^\/(["']?[A-Za-z]:[\\/].+)/);
-
-    if (localPathMatch && localPathMatch[1]) {
-      const localPath = localPathMatch[1];
-      try {
-        const data = await apiService.importPdfLocal(localPath);
-        const newPdfId = data.OriginalFileId || data.id;
-
-        if (newPdfId) {
-          window.history.replaceState({}, '', `/pdf/${newPdfId}`);
-          activePdfId = newPdfId;
-
-          const workspaceData = await apiService.prepareWorkspace(newPdfId);
-
-          if (workspaceData.editState) {
-            let parsedState = workspaceData.editState;
-            while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
-            pages.value = parsedState;
-            autoFitZoom();
-            currentPageIndex.value = 0;
-            await nextTick();
-
-            const hasStamp =
-              Array.isArray(parsedState) &&
-              parsedState.some(
-                (page) =>
-                  Array.isArray(page.objects) &&
-                  page.objects.some(
-                    (obj) =>
-                      (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-                  )
-              );
-
-            await new Promise((r) =>
-              setTimeout(async () => {
-                if (typeof renderAllPages === 'function') await renderAllPages();
-                if (hasStamp) handleRefreshStamp();
-                r();
-              }, 500)
-            );
-
-            if (!hasStamp) {
-
-              try {
-                const stampMeta = await apiService.getStampMetadata(newPdfId);
-                if (addStampBlockToCanvas) {
-                  addStampBlockToCanvas(stampMeta);
-                  setTimeout(async () => {
-                    try {
-                      saveCurrentPageState();
-                      const pagesData = preparePagesForSave();
-                      const fd = new FormData();
-                      fd.append('OriginalFileId', newPdfId);
-                      fd.append('editState', JSON.stringify(pagesData));
-                      await apiService.savePdfState(fd);
-                    } catch (err) {
-                      console.error('Auto-save stamp failed', err);
-                    }
-                  }, 500);
-                }
-              } catch (e) {
-                console.warn('Stamp add failed', e);
-              }
-            }
-          } else {
-            const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-            const downloadedFile = new File([blobData], 'local_import.pdf', {
-              type: 'application/pdf'
-            });
-
-            await resetCanvasWrapper();
-            const images = await processPdfToImages(downloadedFile);
-            if (images.length > 0) {
-              pages.value = images.map((imgObj, idx) => ({
-                id: Date.now() + idx,
-                background: imgObj.dataUrl,
-                width: imgObj.width,
-                height: imgObj.height,
-                objects: [],
-                originalBackgroundType: 'PDF'
-              }));
-              autoFitZoom();
-              currentPageIndex.value = 0;
-              await renderAllPages();
-
-              try {
-                const stampMeta = await apiService.getStampMetadata(newPdfId);
-                if (addStampBlockToCanvas) {
-                  addStampBlockToCanvas(stampMeta);
-                  setTimeout(async () => {
-                    try {
-                      saveCurrentPageState();
-                      const pagesData = preparePagesForSave();
-                      const fd = new FormData();
-                      fd.append('OriginalFileId', newPdfId);
-                      fd.append('editState', JSON.stringify(pagesData));
-                      await apiService.savePdfState(fd);
-                    } catch (err) {
-                      console.error('Auto-save stamp failed', err);
-                    }
-                  }, 500);
-                }
-              } catch (e) {
-                console.warn('Stamp add failed', e);
-              }
-            }
-          }
-          return true;
-        }
-      } catch (error) {
-        console.error('Local Import Failed:', error);
-        alert('ไม่สามารถดึงไฟล์จากเครื่องได้ (ตรวจสอบว่าไฟล์มีอยู่จริง)');
-      }
-    }
-
-    const currentPath = window.location.pathname;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const originalUrlParam = urlParams.get('originalUrl');
-
-    const openMatch = currentPath.match(/^\/path\/(.+)/i);
-    let filepathParam = openMatch ? decodeURIComponent(openMatch[1]) : urlParams.get('filepath');
-
-    if (filepathParam) {
-      filepathParam = '/' + filepathParam.replace(/^\/+/, '');
-
-      try {
-        const blobData = await apiService.downloadBlob(filepathParam);
-
-        const filename = originalUrlParam || filepathParam.split('/').pop() || 'document.pdf';
-        const downloadedFile = new File([blobData], filename, { type: 'application/pdf' });
-
-        if (typeof resetCanvasWrapper === 'function') await resetCanvasWrapper();
-        else if (typeof resetCanvas === 'function') await resetCanvas();
-
-        const images = await processPdfToImages(downloadedFile);
-        if (images.length > 0) {
-          pages.value = images.map((imgObj, idx) => ({
-            id: Date.now() + idx,
-            background: imgObj.dataUrl,
-            width: imgObj.width,
-            height: imgObj.height,
-            objects: [],
-            originalBackgroundType: 'PDF'
-          }));
-          autoFitZoom();
-          currentPageIndex.value = 0;
-          await renderAllPages();
-        }
-      } catch (error) {
-        console.error('Failed to load PDF from filepath param:', error);
-      }
-      return true;
-    }
-
-    const pdfMatch = currentPath.match(/^\/pdf\/([a-zA-Z0-9-]+)/i);
-    if (pdfMatch && pdfMatch[1]) {
-      const fileId = pdfMatch[1];
-
-      activePdfId = fileId;
-
-      try {
-        const backendUrl = apiService.getBackendBase();
-
-        const workspaceData = await apiService.prepareWorkspace(fileId);
-        const tempUrl = `${backendUrl}${workspaceData.tempPath}`;
-
-        if (workspaceData.editState) {
-          try {
-            let parsedState = workspaceData.editState;
-            while (typeof parsedState === 'string') {
-              parsedState = JSON.parse(parsedState);
-            }
-            pages.value = parsedState;
-            autoFitZoom();
-            currentPageIndex.value = 0;
-            await nextTick();
-
-            const hasStamp =
-              Array.isArray(parsedState) &&
-              parsedState.some(
-                (page) =>
-                  Array.isArray(page.objects) &&
-                  page.objects.some(
-                    (obj) =>
-                      (obj.id && String(obj.id).startsWith('stamp_')) || obj.name === 'บล็อกเลขที่รับ'
-                  )
-              );
-
-            if (hasStamp) {
-              await new Promise((r) => {
-                setTimeout(async () => {
-                  if (typeof renderAllPages === 'function') await renderAllPages();
-                  handleRefreshStamp();
-                  r();
-                }, 500);
-              });
-            } else {
-
-              await new Promise((resolve) => {
-                setTimeout(async () => {
-                  if (typeof renderAllPages === 'function') await renderAllPages();
-                  resolve();
-                }, 500);
-              });
-
-              try {
-                const stampMeta = await apiService.getStampMetadata(fileId);
-                if (addStampBlockToCanvas) {
-                  addStampBlockToCanvas(stampMeta);
-                  setTimeout(async () => {
-                    try {
-                      saveCurrentPageState();
-                      const pagesData = preparePagesForSave();
-                      const formData = new FormData();
-                      formData.append('OriginalFileId', fileId);
-                      formData.append('editState', JSON.stringify(pagesData));
-                      await apiService.savePdfState(formData);
-                    } catch (err) {
-                      console.error('Failed to auto-save stamp block', err);
-                    }
-                  }, 500);
-                }
-              } catch (e) {
-                console.warn('Failed to add auto stamp on existing file', e);
-              }
-            }
-          } catch (e) {
-            console.error('Restoration Error', e);
-          }
-        } else {
-          const blobData = await apiService.downloadBlob(workspaceData.tempPath);
-          const downloadedFile = new File([blobData], 'workspace_document.pdf', {
-            type: 'application/pdf'
-          });
-
-          await resetCanvasWrapper();
-          const images = await processPdfToImages(downloadedFile);
-          if (images.length > 0) {
-            pages.value = images.map((imgObj, idx) => ({
-              id: Date.now() + idx,
-              background: imgObj.dataUrl,
-              width: imgObj.width,
-              height: imgObj.height,
-              objects: [],
-              originalBackgroundType: 'PDF'
-            }));
-            autoFitZoom();
-            currentPageIndex.value = 0;
-            await renderAllPages();
-
-            try {
-              const stampMeta = await apiService.getStampMetadata(fileId);
-              if (addStampBlockToCanvas) {
-                addStampBlockToCanvas(stampMeta);
-                setTimeout(async () => {
-                  try {
-                    saveCurrentPageState();
-                    const pagesData = preparePagesForSave();
-                    const formData = new FormData();
-                    formData.append('OriginalFileId', fileId);
-                    formData.append('editState', JSON.stringify(pagesData));
-                    await apiService.savePdfState(formData);
-                  } catch (err) {
-                    console.error('Failed to auto-save stamp block', err);
-                  }
-                }, 500);
-              }
-            } catch (e) {
-              console.warn('Failed to add auto stamp on URL load', e);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load PDF into workspace:', error);
-        alert('Could not load the requested PDF.');
-      }
-      return true;
-    }
-
-    const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-]+)/i);
-    if (historyMatch && historyMatch[1]) {
-      const instanceId = historyMatch[1];
-      try {
-        const r = await apiService.getReportById(instanceId);
-        if (r) {
-          currentReportId.value = r.id;
-          currentDocumentId.value = null;
-          documentTitle.value = r.name;
-          if (r.pages && Array.isArray(r.pages)) {
-            pages.value = sanitizePagesData(JSON.parse(JSON.stringify(r.pages)));
-            autoFitZoom();
-            currentPageIndex.value = 0;
-          }
-          if (typeof resetHistory !== 'undefined' && resetHistory) resetHistory();
-          await nextTick();
-          await renderAllPages();
-        }
-      } catch (error) {
-        console.error('Failed to load history instance from URL:', error);
-      }
-      return true;
-    }
-
-    if (currentPath === '/' || currentPath === '') {
-      try {
-        if (typeof resetCanvasWrapper === 'function') {
-          await resetCanvasWrapper();
-        } else if (typeof resetCanvas === 'function') {
-          await resetCanvas();
-        } else if (typeof pages !== 'undefined') {
-          pages.value = [{ id: Date.now(), background: null, objects: [] }];
-          if (typeof currentPageIndex !== 'undefined') currentPageIndex.value = 0;
-        }
-
-        if (typeof editorStore !== 'undefined') {
-        }
-      } catch (error) {
-        console.error('Error resetting workspace on back navigation:', error);
-      }
-      return true;
-    }
-  } finally {
-    isDocumentLoading.value = false;
-  }
-};
-
-const selectAllObjects = () => {
-  if (!canvas.value) return;
-
-  const objects = canvas.value
-    .getObjects()
-    .filter(
-      (obj) => obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.selectable !== false
-    );
-
-  if (objects.length === 0) return;
-
-  canvas.value.discardActiveObject();
-
-  const selection = new fabric.ActiveSelection(objects, {
-    canvas: canvas.value
-  });
-
-  canvas.value.setActiveObject(selection);
-  canvas.value.requestRenderAll();
-};
+let _wheelHandler = null, _scrollHandler = null, _keydownHandler = null;
 
 onMounted(async () => {
   await nextTick();
@@ -1946,40 +429,26 @@ onMounted(async () => {
   isCanvasReady.value = true;
   initCanvasEvents();
 
-  const routeHandled = await handleRouteChange();
-  window.addEventListener('popstate', handleRouteChange);
+  const routeHandled = await routeHandler.handleRouteChange();
+  window.addEventListener('popstate', routeHandler.handleRouteChange);
 
-  setCanvasCallbacks({
-    saveCurrentPageState,
-    forceUnlockObject,
-    renderAllPages
-  });
-  setDocumentCallbacks({
-    saveCurrentPageState,
-    renderAllPages
-  });
+  setCanvasCallbacks({ saveCurrentPageState, forceUnlockObject, renderAllPages });
+  setDocumentCallbacks({ saveCurrentPageState, renderAllPages });
 
   if (!routeHandled) {
-    if (!pages.value || pages.value.length === 0)
-      pages.value = [{ id: 0, background: null, objects: [] }];
+    if (!pages.value || pages.value.length === 0) pages.value = [{ id: 0, background: null, objects: [] }];
     renderAllPages();
   }
-
   isDocumentLoading.value = false;
 
   _wheelHandler = (e) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      zoomLevel.value = Math.max(0.1, Math.min(3, zoomLevel.value + (e.deltaY > 0 ? -0.1 : 0.1)));
-    }
+    if (e.ctrlKey) { e.preventDefault(); zoomLevel.value = Math.max(0.1, Math.min(3, zoomLevel.value + (e.deltaY > 0 ? -0.1 : 0.1))); }
   };
   _scrollHandler = () => {
     if (!viewportRef.value) return;
     const newIndex = getPageIndexFromTop(viewportRef.value.scrollTop / zoomLevel.value);
-    if (newIndex !== currentPageIndex.value && newIndex >= 0 && newIndex < pages.value.length)
-      currentPageIndex.value = newIndex;
+    if (newIndex !== currentPageIndex.value && newIndex >= 0 && newIndex < pages.value.length) currentPageIndex.value = newIndex;
   };
-
   if (viewportRef.value) {
     viewportRef.value.addEventListener('wheel', _wheelHandler, { passive: false });
     viewportRef.value.addEventListener('scroll', _scrollHandler);
@@ -1988,115 +457,49 @@ onMounted(async () => {
   let clipboard = null;
   _keydownHandler = (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
     const activeObj = canvas.value?.getActiveObject();
+    const ctrl = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
 
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-      if (activeObj && activeObj.isEditing) return;
+    if (ctrl && key === 'a') {
+      if (activeObj?.isEditing) return;
       e.preventDefault();
-      const objects = canvas.value
-        .getObjects()
-        .filter(
-          (obj) => obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.selectable !== false
-        );
-      if (objects.length > 0) {
-        canvas.value.discardActiveObject();
-        const selection = new fabric.ActiveSelection(objects, { canvas: canvas.value });
-        canvas.value.setActiveObject(selection);
-        canvas.value.requestRenderAll();
-      }
+      const objects = canvas.value.getObjects().filter((o) => o.id !== 'page-bg' && o.id !== 'page-bg-image' && o.selectable !== false);
+      if (objects.length > 0) { canvas.value.discardActiveObject(); canvas.value.setActiveObject(new fabric.ActiveSelection(objects, { canvas: canvas.value })); canvas.value.requestRenderAll(); }
       return;
     }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-      if (activeObj && activeObj.isEditing) return;
-      e.preventDefault();
-      if (e.shiftKey) {
-        if (typeof redo === 'function') redo();
-      } else {
-        if (typeof undo === 'function') undo();
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-      if (activeObj && activeObj.isEditing) return;
-      e.preventDefault();
-      if (typeof redo === 'function') redo();
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-      if (activeObj && !activeObj.isEditing) {
-        e.preventDefault();
-        activeObj.clone((cloned) => {
-          clipboard = cloned;
-        });
-      }
-      return;
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    if (ctrl && key === 'z') { if (activeObj?.isEditing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if (ctrl && key === 'y') { if (activeObj?.isEditing) return; e.preventDefault(); redo(); return; }
+    if (ctrl && key === 'c') { if (activeObj && !activeObj.isEditing) { e.preventDefault(); activeObj.clone((c) => { clipboard = c; }); } return; }
+    if (ctrl && key === 'v') {
       if (clipboard && canvas.value) {
         e.preventDefault();
         clipboard.clone((clonedObj) => {
           canvas.value.discardActiveObject();
-          clonedObj.set({
-            left: clonedObj.left + 20,
-            top: clonedObj.top + 20,
-            evented: true,
-            selectable: true
-          });
-
-          if (clonedObj.type === 'activeSelection') {
-            clonedObj.canvas = canvas.value;
-            clonedObj.forEachObject((obj) => {
-              obj.id = 'obj_' + Date.now() + Math.random();
-              canvas.value.add(obj);
-            });
-            clonedObj.setCoords();
-          } else {
-            clonedObj.id = 'obj_' + Date.now() + Math.random();
-            canvas.value.add(clonedObj);
-          }
-          clipboard.top += 20;
-          clipboard.left += 20;
-          canvas.value.setActiveObject(clonedObj);
-          canvas.value.requestRenderAll();
-          if (typeof saveHistory === 'function') saveHistory();
+          clonedObj.set({ left: clonedObj.left + 20, top: clonedObj.top + 20, evented: true, selectable: true });
+          if (clonedObj.type === 'activeSelection') { clonedObj.canvas = canvas.value; clonedObj.forEachObject((o) => { o.id = 'obj_' + Date.now() + Math.random(); canvas.value.add(o); }); clonedObj.setCoords(); }
+          else { clonedObj.id = 'obj_' + Date.now() + Math.random(); canvas.value.add(clonedObj); }
+          clipboard.top += 20; clipboard.left += 20;
+          canvas.value.setActiveObject(clonedObj); canvas.value.requestRenderAll(); saveHistory();
         });
       }
       return;
     }
-
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      const activeObj = canvas.value?.getActiveObject();
-      if (activeObj && !activeObj.isEditing) {
-        e.preventDefault();
-        if (typeof removeSelectedObject === 'function') removeSelectedObject();
-        return;
-      } else if (typeof isPagesSidebarOpen !== 'undefined' && isPagesSidebarOpen?.value) {
-        if (typeof deletePage === 'function') deletePage(currentPageIndex.value);
-      }
+      if (activeObj && !activeObj.isEditing) { e.preventDefault(); removeSelectedObject(); }
     }
   };
   window.addEventListener('keydown', _keydownHandler);
   window.addEventListener('beforeunload', triggerTempCleanup);
-  window.addEventListener('popstate', () => {
-    triggerTempCleanup();
-  });
+  window.addEventListener('popstate', triggerTempCleanup);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('popstate', handleRouteChange);
+  window.removeEventListener('popstate', routeHandler.handleRouteChange);
   window.removeEventListener('beforeunload', triggerTempCleanup);
   if (_keydownHandler) window.removeEventListener('keydown', _keydownHandler);
   triggerTempCleanup();
-
-  if (typeof disposeCanvas === 'function') {
-    disposeCanvas();
-  }
-
+  if (typeof disposeCanvas === 'function') disposeCanvas();
   if (viewportRef.value) {
     if (_wheelHandler) viewportRef.value.removeEventListener('wheel', _wheelHandler);
     if (_scrollHandler) viewportRef.value.removeEventListener('scroll', _scrollHandler);

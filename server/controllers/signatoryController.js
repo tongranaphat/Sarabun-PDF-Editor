@@ -4,7 +4,7 @@ const logger = require('../utils/logger');
 exports.getSignatories = async (req, res) => {
     try {
         const signatories = await prisma.signatory.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'asc' }
         });
         res.json(signatories);
     } catch (error) {

@@ -26,14 +26,18 @@ const getStampConfig = async (req, res) => {
 const updateStampConfig = async (req, res) => {
     try {
         const { id } = req.params;
-        const { schoolName } = req.body;
+        const { schoolName, seqNo, dateStr, timeStr } = req.body;
 
         const updated = await prisma.stampConfig.update({
             where: { id },
             data: {
-                ...(schoolName !== undefined && { schoolName })
+                ...(schoolName !== undefined && { schoolName }),
+                ...(seqNo !== undefined && { seqNo }),
+                ...(dateStr !== undefined && { dateStr }),
+                ...(timeStr !== undefined && { timeStr })
             }
         });
+
 
         res.json(updated);
     } catch (error) {

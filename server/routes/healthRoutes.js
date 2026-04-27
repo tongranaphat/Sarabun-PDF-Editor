@@ -3,7 +3,6 @@ const router = express.Router();
 const { asyncHandler } = require('../utils/errorHandler');
 const prisma = require('../prismaClient');
 
-
 router.get(
     '/health',
     asyncHandler(async (req, res) => {

@@ -200,5 +200,5 @@ export function useCanvasEvents(canvas, pages, currentPageIndex, saveHistory) {
     });
   };
 
-  return { initCanvasEvents };
+  return { initCanvasEvents, updateObjectClipPath, restoreClipPathsAfterSelection };
 }

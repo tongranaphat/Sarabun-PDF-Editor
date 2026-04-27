@@ -65,7 +65,7 @@
 
         <div v-if="activeTab === 'data'" class="tab-pane-data">
           <div class="data-section" v-if="signatories.length > 0">
-            <h4 class="label-small">บล็อกลายเซ็น:</h4>
+            <h4 class="label-small">เกษียณหนังสือ:</h4>
             <div class="var-list">
               <button v-for="sig in signatories" :key="sig.id" draggable="true"
                 @dragstart="onSignatureDragStart($event, sig)" @click="$emit('add-signature-block', sig)"
@@ -79,14 +79,14 @@
           </div>
 
           <div class="data-section">
-            <h4 class="label-small">ข้อความทั่วไป:</h4>
+            <!-- <h4 class="label-small">ข้อความทั่วไป:</h4>
             <button @click="handleAddCustomText" class="var-btn" draggable="true"
               @dragstart="onCustomTextDragStart($event)">
               <div class="var-btn-icon-holder"><span class="var-btn-icon">{ }</span></div>
               <span class="var-btn-text">ข้อความอิสระ (พิมพ์เอง)</span>
-            </button>
+            </button> -->
           </div>
-          <div class="divider-line" style="margin-top: 15px"></div>
+          <!-- <div class="divider-line" style="margin-top: 15px"></div> -->
         </div>
       </div>
     </div>
@@ -559,8 +559,6 @@ const onCustomTextDragStart = (e) => {
 }
 
 .label-small {
-  width: 70px;
-  height: 20px;
   text-align: left;
   font:
     normal normal normal 18px/24px 'TH Sarabun New',

@@ -620,22 +620,6 @@ const savePdfState = async (req, res) => {
             }
         }
 
-        const isLocalPath =
-            pdf.OriginalUrlorPath &&
-            (pdf.OriginalUrlorPath.includes(':') || pdf.OriginalUrlorPath.startsWith('\\\\')) &&
-            !pdf.OriginalUrlorPath.toLowerCase().startsWith('http');
-
-        if (isLocalPath) {
-            try {
-                const localDir = path.dirname(pdf.OriginalUrlorPath);
-
-                const localEditedPath = path.join(localDir, `edited_${pdf.FileName}`);
-                fs.copyFileSync(absoluteEditedPath, localEditedPath);
-                console.log(`[savePdfState] Synced latest version to local folder: ${localEditedPath}`);
-            } catch (localErr) {
-                console.warn(`[savePdfState] Could not sync to local folder (Permissions?): ${localErr.message}`);
-            }
-        }
 
         if (pdf.EditedFile && pdf.EditedFilePath) {
             const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
@@ -751,28 +735,13 @@ const saveGeneratedPdfState = async (req, res) => {
         fs.copyFileSync(req.file.path, absoluteNewEdited);
         fs.unlinkSync(req.file.path);
 
-        const isLocalPath =
-            pdf.OriginalUrlorPath &&
-            (pdf.OriginalUrlorPath.includes(':') || pdf.OriginalUrlorPath.startsWith('\\\\')) &&
-            !pdf.OriginalUrlorPath.toLowerCase().startsWith('http');
-
-        if (isLocalPath) {
-            try {
-                const localDir = path.dirname(pdf.OriginalUrlorPath);
-                const localEditedPath = path.join(localDir, `edited_${pdf.FileName}`);
-                fs.copyFileSync(absoluteNewEdited, localEditedPath);
-                console.log(`[saveGeneratedPdfState] Synced to local folder: ${localEditedPath}`);
-            } catch (e) {
-                console.warn(`[saveGeneratedPdfState] Failed to sync to local folder: ${e.message}`);
-            }
-        }
 
         if (pdf.EditedFile && pdf.EditedFilePath) {
             const oldPath = path.join(__dirname, '..', pdf.EditedFilePath.replace(/^\//, ''));
             if (fs.existsSync(oldPath) && oldPath !== path.join(__dirname, '..', pdf.FilePath.replace(/^\//, ''))) {
                 try {
                     fs.unlinkSync(oldPath);
-                } catch (e) {}
+                } catch (e) { }
             }
         }
         const updatedPdf = await prisma.pdfCache.update({
@@ -832,13 +801,35 @@ const getStampMetadata = async (req, res) => {
         let stampConfig = await prisma.stampConfig.findUnique({ where: { pdfCacheId: fileId } });
 
         if (!stampConfig) {
-            const lastStamp = await prisma.stampConfig.findFirst({ orderBy: { seqNo: 'desc' } });
-            const nextSeqNo = lastStamp ? lastStamp.seqNo + 1 : 1;
+            const currentYearBE = new Date().getFullYear() + 543;
+            const lastStamp = await prisma.stampConfig.findFirst({
+                orderBy: { createdAt: 'desc' }
+            });
+
+            let nextSeqNoValue = `1/${currentYearBE}`;
+
+            if (lastStamp && lastStamp.seqNo) {
+                const parts = lastStamp.seqNo.split('/');
+                if (parts.length === 2) {
+                    const lastNum = parseInt(parts[0], 10);
+                    const lastYear = parseInt(parts[1], 10);
+
+                    if (lastYear === currentYearBE) {
+                        nextSeqNoValue = `${lastNum + 1}/${currentYearBE}`;
+                    }
+                } else {
+                    // Fallback for old numeric format
+                    const lastNum = parseInt(lastStamp.seqNo, 10);
+                    if (!isNaN(lastNum)) {
+                        nextSeqNoValue = `${lastNum + 1}/${currentYearBE}`;
+                    }
+                }
+            }
 
             stampConfig = await prisma.stampConfig.create({
                 data: {
                     pdfCacheId: fileId,
-                    seqNo: nextSeqNo,
+                    seqNo: nextSeqNoValue,
                     schoolName: 'โรงเรียนทดสอบ'
                 }
             });
@@ -847,20 +838,34 @@ const getStampMetadata = async (req, res) => {
         const user = await prisma.user.findFirst();
         const receiverName = user ? user.username : 'ไม่ระบุ';
 
-        const targetDate = stampConfig.createdAt;
-        const thDate = targetDate.toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' });
-        const thTime =
-            targetDate
+        let thDate = stampConfig.dateStr;
+        let thTime = stampConfig.timeStr;
+
+        if (!thDate || !thTime) {
+            const targetDate = stampConfig.createdAt;
+            thDate = targetDate.toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' });
+            thTime = targetDate
                 .toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })
                 .replace(':', '.') + ' น.';
 
+            await prisma.stampConfig.update({
+                where: { id: stampConfig.id },
+                data: {
+                    dateStr: thDate,
+                    timeStr: thTime
+                }
+            });
+        }
+
         res.json({
+            id: stampConfig.id,
             schoolName: stampConfig.schoolName,
             seqNo: stampConfig.seqNo,
             date: thDate,
             time: thTime,
             receiverName: receiverName
         });
+
     } catch (error) {
         console.error('[getStampMetadata] Error:', error);
         res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลแสตมป์ได้' });

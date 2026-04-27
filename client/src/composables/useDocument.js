@@ -86,6 +86,21 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     }));
   };
 
+  const autoFitZoom = () => {
+    if (!pages.value || pages.value.length === 0) return;
+    let maxWidth = 0;
+    for (let i = 0; i < pages.value.length; i++) {
+      const w = Number(pages.value[i].width) || CANVAS_CONSTANTS.PAGE_WIDTH;
+      if (w > maxWidth) maxWidth = w;
+    }
+    if (maxWidth > 0) {
+      let newZoom = CANVAS_CONSTANTS.PAGE_WIDTH / maxWidth;
+      if (newZoom < CANVAS_CONSTANTS.MIN_ZOOM) newZoom = CANVAS_CONSTANTS.MIN_ZOOM;
+      if (newZoom > CANVAS_CONSTANTS.MAX_ZOOM) newZoom = CANVAS_CONSTANTS.MAX_ZOOM;
+      zoomLevel.value = Number(newZoom.toFixed(2));
+    }
+  };
+
   const isWorkspaceEmpty = () => {
     if (!pages.value || pages.value.length === 0) return true;
     if (pages.value.length > 1) return false;
@@ -235,6 +250,7 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
                 let parsedState = workspaceData.editState;
                 while (typeof parsedState === 'string') parsedState = JSON.parse(parsedState);
                 pages.value = sanitizePagesData(parsedState);
+                autoFitZoom();
               } else {
                 const blobData = await apiService.downloadBlob(workspaceData.tempPath);
                 const downloadedFile = new File([blobData], file.name, { type: 'application/pdf' });
@@ -248,6 +264,7 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
                     objects: [],
                     originalBackgroundType: 'PDF'
                   }));
+                  autoFitZoom();
                 }
               }
 
@@ -297,6 +314,7 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
                   objects: [],
                   originalBackgroundType: 'PDF'
                 }));
+                autoFitZoom();
                 currentPageIndex.value = 0;
               }
             }
@@ -337,6 +355,7 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     handleUnifiedImport,
     processPdfToImages,
     saveFileWithFallback,
-    setDocumentCallbacks
+    setDocumentCallbacks,
+    autoFitZoom
   };
 }

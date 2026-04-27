@@ -1,5 +1,8 @@
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+
 export function useEditablePdf() {
   const PDF_W = 595.28;
   const CVS_W = CANVAS_CONSTANTS.PAGE_WIDTH;
@@ -19,14 +22,6 @@ export function useEditablePdf() {
       canvasImagesOrPages[0].startsWith('data:image');
 
     const canvasImages = isImageMode ? canvasImagesOrPages : [];
-
-    if (!window.PDFLib) {
-      alert('PDF Library is still loading. Please wait a moment.');
-      return null;
-    }
-
-    const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
-    const fontkit = window.fontkit;
 
     try {
       const pdfDoc = await PDFDocument.create();

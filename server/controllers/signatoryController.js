@@ -1,14 +1,10 @@
 const prisma = require('../prismaClient');
 const logger = require('../utils/logger');
+const { asyncHandler } = require('../utils/errorHandler');
 
-exports.getSignatories = async (req, res) => {
-    try {
-        const signatories = await prisma.signatory.findMany({
-            orderBy: { createdAt: 'asc' }
-        });
-        res.json(signatories);
-    } catch (error) {
-        logger.error('Error fetching signatories:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-};
+exports.getSignatories = asyncHandler(async (req, res) => {
+    const signatories = await prisma.signatory.findMany({
+        orderBy: { createdAt: 'asc' }
+    });
+    res.json(signatories);
+});

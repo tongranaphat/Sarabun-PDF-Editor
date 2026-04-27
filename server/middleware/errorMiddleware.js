@@ -1,6 +1,4 @@
-const logger = {
-    error: (msg, err) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`, err || '')
-};
+const logger = require('../utils/logger');
 
 const errorHandler = (err, req, res, next) => {
     logger.error(`Error in ${req.method} ${req.url}`, err);

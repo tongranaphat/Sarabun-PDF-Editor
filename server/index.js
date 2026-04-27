@@ -11,7 +11,7 @@ const prisma = require('./prismaClient');
 
 
 const logger = require('./utils/logger');
-const { errorHandler, notFound } = require('./middleware/errorMiddleware');
+const { globalErrorHandler, notFound } = require('./utils/errorHandler');
 
 const variableRoutes = require('./routes/variableRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
@@ -23,10 +23,21 @@ const stampConfigRoutes = require('./routes/stampConfigRoutes');
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+    : null;
+
 app.use(
     cors({
         origin: function (origin, callback) {
-            callback(null, true);
+            if (process.env.NODE_ENV !== 'production') return callback(null, true);
+            if (!origin) return callback(null, true);
+            if (!allowedOrigins) return callback(null, true);
+            if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+            logger.warn(`CORS blocked origin: ${origin}`);
+            return callback(new Error(`Origin ${origin} not allowed by CORS`));
         },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Machine-ID', 'Accept', 'Origin', 'X-Requested-With'],
@@ -74,7 +85,7 @@ app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
 
 app.use(notFound);
-app.use(errorHandler);
+app.use(globalErrorHandler);
 
 const startServer = async () => {
     try {

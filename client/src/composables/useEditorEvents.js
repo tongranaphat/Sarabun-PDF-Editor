@@ -55,7 +55,6 @@ export function useEditorEvents(deps) {
       const ctrl = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
-      // Select All (Ctrl+A)
       if (ctrl && key === 'a') {
         if (activeObj?.isEditing) return;
         e.preventDefault();
@@ -70,7 +69,6 @@ export function useEditorEvents(deps) {
         return;
       }
 
-      // Undo (Ctrl+Z) / Redo (Ctrl+Shift+Z)
       if (ctrl && key === 'z') {
         if (activeObj?.isEditing) return;
         e.preventDefault();
@@ -78,7 +76,6 @@ export function useEditorEvents(deps) {
         return;
       }
 
-      // Redo (Ctrl+Y)
       if (ctrl && key === 'y') {
         if (activeObj?.isEditing) return;
         e.preventDefault();
@@ -86,7 +83,6 @@ export function useEditorEvents(deps) {
         return;
       }
 
-      // Copy (Ctrl+C)
       if (ctrl && key === 'c') {
         if (activeObj && !activeObj.isEditing) {
           e.preventDefault();
@@ -95,7 +91,6 @@ export function useEditorEvents(deps) {
         return;
       }
 
-      // Paste (Ctrl+V)
       if (ctrl && key === 'v') {
         if (clipboard && canvas.value) {
           e.preventDefault();
@@ -123,7 +118,6 @@ export function useEditorEvents(deps) {
         return;
       }
 
-      // Delete / Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (activeObj && !activeObj.isEditing) {
           e.preventDefault();

@@ -1,14 +1,20 @@
 import { ref, nextTick } from 'vue';
+import { storeToRefs } from 'pinia';
 import { fabric } from 'fabric';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
+import { useEditorStore } from '../stores/editorStore';
 
 /**
  * Manages page rendering, navigation, state serialization, and layout calculations.
  * Extracted from EditorView.vue to reduce God Component complexity.
+ *
+ * pages and currentPageIndex are now sourced directly from Pinia (single source of truth)
+ * instead of being passed as function arguments.
  */
-export function usePageManager(canvas, pages, currentPageIndex, zoomLevel, canvasBaseDimensions) {
+export function usePageManager(canvas, zoomLevel, canvasBaseDimensions) {
+  const store = useEditorStore();
+  const { pages, currentPageIndex } = storeToRefs(store);
   let isRendering = false;
-
 
   const getWorkspaceMaxWidth = () => {
     let globalMaxWidth = 0;
@@ -42,7 +48,6 @@ export function usePageManager(canvas, pages, currentPageIndex, zoomLevel, canva
     }
     return Math.max(0, pages.value.length - 1);
   };
-
 
   const forceUnlockObject = (obj) => {
     if (!obj) return;
@@ -91,7 +96,6 @@ export function usePageManager(canvas, pages, currentPageIndex, zoomLevel, canva
       }
     });
   };
-
 
   const renderAllPages = async (options = { infraOnly: false }, deps = {}) => {
     if (!canvas.value) return;
@@ -232,7 +236,6 @@ export function usePageManager(canvas, pages, currentPageIndex, zoomLevel, canva
     }
   };
 
-
   let isSavingState = false;
 
   const saveCurrentPageState = () => {
@@ -298,7 +301,6 @@ export function usePageManager(canvas, pages, currentPageIndex, zoomLevel, canva
       isSavingState = false;
     }
   };
-
 
   const scrollToPage = (viewportRef, index) => {
     if (!viewportRef?.value) return;

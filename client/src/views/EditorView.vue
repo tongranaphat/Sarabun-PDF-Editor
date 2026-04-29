@@ -41,7 +41,6 @@
 
 <script setup>
 import { onMounted, ref, watch, nextTick, onUnmounted, computed } from 'vue';
-import { fabric } from 'fabric';
 import TopNavbar from '../components/TopNavbar.vue';
 import PropertiesPanel from '../components/PropertiesPanel.vue';
 import Sidebar from '../components/Sidebar.vue';
@@ -57,6 +56,7 @@ import { usePageManager } from '../composables/usePageManager';
 import { useExportPdf } from '../composables/useExportPdf';
 import { useStampAutoAdd } from '../composables/useStampAutoAdd';
 import { useRouteHandler } from '../composables/useRouteHandler';
+import { useEditorEvents } from '../composables/useEditorEvents';
 import { useEditorStore } from '../stores/editorStore';
 import { CANVAS_CONSTANTS } from '../constants/canvas';
 import { showNotification } from '../utils/notifications';
@@ -124,7 +124,7 @@ if (setHistoryContext) setHistoryContext(pages, currentPageIndex);
 const { initCanvasEvents, updateObjectClipPath } = useCanvasEvents(canvas, pages, currentPageIndex, saveHistory);
 const { generateHybridPdfBlob, captureCanvasPageSafe } = useEditablePdf();
 
-const pageManager = usePageManager(canvas, pages, currentPageIndex, zoomLevel, canvasBaseDimensions);
+const pageManager = usePageManager(canvas, zoomLevel, canvasBaseDimensions);
 const { captureAllPages, buildExportProjectData, fetchVariableMap, restoreCanvasAfterCapture } = useExportPdf();
 const { autoAddStamp, hasStampInState } = useStampAutoAdd();
 
@@ -421,7 +421,11 @@ const onDrop = (e) => {
   }
 };
 
-let _wheelHandler = null, _scrollHandler = null, _keydownHandler = null;
+const editorEvents = useEditorEvents({
+  canvas, zoomLevel, viewportRef,
+  undo, redo, removeSelectedObject, saveHistory,
+  getPageIndexFromTop, pages, currentPageIndex
+});
 
 onMounted(async () => {
   await nextTick();
@@ -441,55 +445,7 @@ onMounted(async () => {
   }
   isDocumentLoading.value = false;
 
-  _wheelHandler = (e) => {
-    if (e.ctrlKey) { e.preventDefault(); zoomLevel.value = Math.max(0.1, Math.min(3, zoomLevel.value + (e.deltaY > 0 ? -0.1 : 0.1))); }
-  };
-  _scrollHandler = () => {
-    if (!viewportRef.value) return;
-    const newIndex = getPageIndexFromTop(viewportRef.value.scrollTop / zoomLevel.value);
-    if (newIndex !== currentPageIndex.value && newIndex >= 0 && newIndex < pages.value.length) currentPageIndex.value = newIndex;
-  };
-  if (viewportRef.value) {
-    viewportRef.value.addEventListener('wheel', _wheelHandler, { passive: false });
-    viewportRef.value.addEventListener('scroll', _scrollHandler);
-  }
-
-  let clipboard = null;
-  _keydownHandler = (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    const activeObj = canvas.value?.getActiveObject();
-    const ctrl = e.ctrlKey || e.metaKey;
-    const key = e.key.toLowerCase();
-
-    if (ctrl && key === 'a') {
-      if (activeObj?.isEditing) return;
-      e.preventDefault();
-      const objects = canvas.value.getObjects().filter((o) => o.id !== 'page-bg' && o.id !== 'page-bg-image' && o.selectable !== false);
-      if (objects.length > 0) { canvas.value.discardActiveObject(); canvas.value.setActiveObject(new fabric.ActiveSelection(objects, { canvas: canvas.value })); canvas.value.requestRenderAll(); }
-      return;
-    }
-    if (ctrl && key === 'z') { if (activeObj?.isEditing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
-    if (ctrl && key === 'y') { if (activeObj?.isEditing) return; e.preventDefault(); redo(); return; }
-    if (ctrl && key === 'c') { if (activeObj && !activeObj.isEditing) { e.preventDefault(); activeObj.clone((c) => { clipboard = c; }); } return; }
-    if (ctrl && key === 'v') {
-      if (clipboard && canvas.value) {
-        e.preventDefault();
-        clipboard.clone((clonedObj) => {
-          canvas.value.discardActiveObject();
-          clonedObj.set({ left: clonedObj.left + 20, top: clonedObj.top + 20, evented: true, selectable: true });
-          if (clonedObj.type === 'activeSelection') { clonedObj.canvas = canvas.value; clonedObj.forEachObject((o) => { o.id = 'obj_' + Date.now() + Math.random(); canvas.value.add(o); }); clonedObj.setCoords(); }
-          else { clonedObj.id = 'obj_' + Date.now() + Math.random(); canvas.value.add(clonedObj); }
-          clipboard.top += 20; clipboard.left += 20;
-          canvas.value.setActiveObject(clonedObj); canvas.value.requestRenderAll(); saveHistory();
-        });
-      }
-      return;
-    }
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (activeObj && !activeObj.isEditing) { e.preventDefault(); removeSelectedObject(); }
-    }
-  };
-  window.addEventListener('keydown', _keydownHandler);
+  editorEvents.attach();
   window.addEventListener('beforeunload', triggerTempCleanup);
   window.addEventListener('popstate', triggerTempCleanup);
 });
@@ -497,13 +453,9 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate', routeHandler.handleRouteChange);
   window.removeEventListener('beforeunload', triggerTempCleanup);
-  if (_keydownHandler) window.removeEventListener('keydown', _keydownHandler);
+  editorEvents.detach();
   triggerTempCleanup();
   if (typeof disposeCanvas === 'function') disposeCanvas();
-  if (viewportRef.value) {
-    if (_wheelHandler) viewportRef.value.removeEventListener('wheel', _wheelHandler);
-    if (_scrollHandler) viewportRef.value.removeEventListener('scroll', _scrollHandler);
-  }
 });
 </script>
 

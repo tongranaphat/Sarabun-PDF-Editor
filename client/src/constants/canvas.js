@@ -1,3 +1,21 @@
+/**
+ * Custom properties to preserve during Fabric.js serialization/deserialization.
+ * Single source of truth — used by useCanvas.js, useExportPdf.js, and usePageManager.js.
+ */
+export const CUSTOM_PROPS = [
+  'id',
+  'selectable',
+  'name',
+  'textBaseline',
+  'angle',
+  'isSignatureBlock',
+  'isSignaturePrefix',
+  'isStampBlock',
+  'stampData',
+  'linkedId',
+  'sigData'
+];
+
 export const CANVAS_CONSTANTS = {
   PAGE_WIDTH: 794,
   PAGE_HEIGHT: 1123,
@@ -20,7 +38,9 @@ export const CANVAS_CONSTANTS = {
   IMAGE_QUALITY: 0.8,
   PDF_MULTIPLIER: 2,
 
-  MAX_HISTORY: 50,
+  MAX_HISTORY: 20,
+
+  HISTORY_DEBOUNCE_MS: 300,
 
   RENDER_DELAY: 100,
   ZOOM_RENDER_DELAY: 200,

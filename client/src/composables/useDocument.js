@@ -159,7 +159,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
     }
   };
 
-
   const resetCanvas = async () => {
     if (!canvas.value) return;
     editorStore.resetState();
@@ -332,8 +331,6 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
       input.click();
     });
   };
-
-
 
   return {
     documentTitle,

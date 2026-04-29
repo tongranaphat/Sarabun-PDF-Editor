@@ -43,7 +43,6 @@ export const apiService = {
     return response.data;
   },
 
-
   async getSignatories() {
     const response = await api.get('/signatories');
     return response.data;
@@ -112,7 +111,6 @@ export const apiService = {
     return BACKEND_BASE;
   },
 };
-
 
 export default apiService;
 export { api };

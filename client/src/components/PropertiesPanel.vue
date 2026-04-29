@@ -2,36 +2,22 @@
   <div v-if="hasSelection" class="floating-toolbar">
     <template v-if="isText">
       <div class="toolbar-group font-picker-wrapper" ref="pickerRef">
-        <button
-          class="dropdown-btn font-btn"
-          title="ฟอนต์"
-          @click.stop="togglePicker"
-          :style="{ fontFamily: activeObject?.fontFamily || 'Sarabun' }"
-        >
+        <button class="dropdown-btn font-btn" title="ฟอนต์" @click.stop="togglePicker"
+          :style="{ fontFamily: activeObject?.fontFamily || 'Sarabun' }">
           <span class="font-btn-label">{{ activeFontLabel }}</span>
           <span class="arrow">▾</span>
         </button>
 
         <div v-if="showFontPicker" class="font-dropdown" @click.stop>
-          <input
-            v-model="fontSearch"
-            class="font-search"
-            placeholder="ค้นหาฟอนต์..."
-            @input="filterFonts"
-          />
+          <input v-model="fontSearch" class="font-search" placeholder="ค้นหาฟอนต์..." @input="filterFonts" />
           <div class="font-list" ref="fontListRef">
             <div v-if="filteredThaiFonts.length" class="font-group">
               <div class="font-group-header thai-header">
                 🇹🇭 รองรับภาษาไทย ({{ filteredThaiFonts.length }})
               </div>
-              <div
-                v-for="font in filteredThaiFonts"
-                :key="font.value"
-                class="font-option"
+              <div v-for="font in filteredThaiFonts" :key="font.value" class="font-option"
                 :class="{ active: (activeObject?.fontFamily || 'Sarabun') === font.value }"
-                :style="{ fontFamily: font.value }"
-                @click="selectFont(font.value)"
-              >
+                :style="{ fontFamily: font.value }" @click="selectFont(font.value)">
                 <span class="font-name">{{ font.label }}</span>
                 <span class="font-preview-text">กขค ABC</span>
               </div>
@@ -40,14 +26,9 @@
               <div class="font-group-header latin-header">
                 🔤 ภาษาอังกฤษ ({{ filteredLatinFonts.length }})
               </div>
-              <div
-                v-for="font in filteredLatinFonts"
-                :key="font.value"
-                class="font-option latin-font"
+              <div v-for="font in filteredLatinFonts" :key="font.value" class="font-option latin-font"
                 :class="{ active: (activeObject?.fontFamily || 'Sarabun') === font.value }"
-                :style="{ fontFamily: font.value }"
-                @click="selectFont(font.value)"
-              >
+                :style="{ fontFamily: font.value }" @click="selectFont(font.value)">
                 <span class="font-name">{{ font.label }}</span>
                 <span class="font-preview-text">Aa Bb Cc</span>
               </div>
@@ -59,42 +40,24 @@
       <div class="divider"></div>
 
       <div class="toolbar-group">
-        <input
-          type="number"
-          :value="activeFontSize"
-          @input="handleNumberInput('fontSize', $event)"
-          @blur="handleNumberBlur('fontSize', $event, activeFontSize)"
-          @keydown.enter="$event.target.blur()"
-          @keydown="preventInvalidChars"
-          class="size-input"
-          min="1"
-          step="1"
-          title="ขนาดตัวอักษร"
-        />
+        <input type="number" :value="activeFontSize" @input="handleNumberInput('fontSize', $event)"
+          @blur="handleNumberBlur('fontSize', $event, activeFontSize)" @keydown.enter="$event.target.blur()"
+          @keydown="preventInvalidChars" class="size-input" min="1" step="1" title="ขนาดตัวอักษร" />
       </div>
 
       <div class="divider"></div>
 
       <div class="toolbar-group style-buttons">
-        <button
-          @click="toggleBold"
-          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontWeight === 'bold' }]"
-          title="ตัวหนา"
-        >
+        <button @click="toggleBold" :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontWeight === 'bold' }]"
+          title="ตัวหนา">
           <span style="font-weight: bold">B</span>
         </button>
-        <button
-          @click="toggleItalic"
-          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontStyle === 'italic' }]"
-          title="ตัวเอียง"
-        >
+        <button @click="toggleItalic"
+          :class="['icon-btn', { 'icon-btn-selected': activeObject?.fontStyle === 'italic' }]" title="ตัวเอียง">
           <span style="font-style: italic">I</span>
         </button>
-        <button
-          @click="toggleUnderline"
-          :class="['icon-btn', { 'icon-btn-selected': activeObject?.underline }]"
-          title="ขีดเส้นใต้"
-        >
+        <button @click="toggleUnderline" :class="['icon-btn', { 'icon-btn-selected': activeObject?.underline }]"
+          title="ขีดเส้นใต้">
           <span style="text-decoration: underline">U</span>
         </button>
       </div>
@@ -102,29 +65,20 @@
       <div class="divider"></div>
 
       <div class="toolbar-group segmented-control">
-        <button
-          @click="setAlignment('left')"
-          :class="['icon-btn', { active: activeTextAlign === 'left' }]"
-          title="จัดซ้าย"
-        >
+        <button @click="setAlignment('left')" :class="['icon-btn', { active: activeTextAlign === 'left' }]"
+          title="จัดซ้าย">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm0 5h12v2H3V9zm0 5h18v2H3v-2zm0 5h12v2H3v-2z" />
           </svg>
         </button>
-        <button
-          @click="setAlignment('center')"
-          :class="['icon-btn', { active: activeTextAlign === 'center' }]"
-          title="จัดกลาง"
-        >
+        <button @click="setAlignment('center')" :class="['icon-btn', { active: activeTextAlign === 'center' }]"
+          title="จัดกลาง">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm4 5h10v2H7V9zm-4 5h18v2H3v-2zm4 5h10v2H7v-2z" />
           </svg>
         </button>
-        <button
-          @click="setAlignment('right')"
-          :class="['icon-btn', { active: activeTextAlign === 'right' }]"
-          title="จัดขวา"
-        >
+        <button @click="setAlignment('right')" :class="['icon-btn', { active: activeTextAlign === 'right' }]"
+          title="จัดขวา">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 4h18v2H3V4zm6 5h12v2H9V9zm-6 5h18v2H3v-2zm6 5h12v2H9v-2z" />
           </svg>
@@ -139,13 +93,8 @@
 
       <div class="toolbar-group">
         <div class="color-wrapper" title="เลือกสี">
-          <input
-            type="color"
-            :value="activeFillColor"
-            @input="updateProp('fill', $event.target.value, true)"
-            @change="updateProp('fill', $event.target.value, true)"
-            class="color-input"
-          />
+          <input type="color" :value="activeFillColor" @input="updateProp('fill', $event.target.value, true)"
+            @change="updateProp('fill', $event.target.value, true)" class="color-input" />
           <span class="color-preview" :style="{ backgroundColor: activeFillColor }"></span>
         </div>
       </div>
@@ -154,29 +103,19 @@
     <div class="divider" v-if="isText || isShape"></div>
 
     <div v-if="selectionCategory !== 'mixed' && !isSignature" class="toolbar-group relative">
-      <button
-        @click.stop="
-          showOpacity = !showOpacity;
-          showSpacing = false;
-          showFontPicker = false;
-        "
-        class="dropdown-btn"
-        title="ความทึบ"
-      >
-        <span :class="showOpacity ? 'text-active' : 'text-muted'"
-          >{{ Math.round(activeOpacity * 100) }}%</span
-        >
+      <button @click.stop="
+        showOpacity = !showOpacity;
+      showSpacing = false;
+      showFontPicker = false;
+      " class="dropdown-btn" title="ความทึบ">
+        <span :class="showOpacity ? 'text-active' : 'text-muted'">{{ Math.round(activeOpacity * 100) }}%</span>
         <span class="arrow">▾</span>
       </button>
 
       <div v-if="showOpacity" class="dropdown-menu" @click.stop>
         <div class="dropdown-header">ความทึบ</div>
-        <button
-          v-for="val in [1, 0.9, 0.75, 0.5, 0.25]"
-          :key="val"
-          @click="setOpacity(val)"
-          :class="['dropdown-item', { active: Math.abs(activeOpacity - val) < 0.01 }]"
-        >
+        <button v-for="val in [1, 0.9, 0.75, 0.5, 0.25]" :key="val" @click="setOpacity(val)"
+          :class="['dropdown-item', { active: Math.abs(activeOpacity - val) < 0.01 }]">
           {{ val * 100 }}%
         </button>
       </div>
@@ -184,17 +123,9 @@
 
     <div v-if="isSignature" class="toolbar-group scale-group">
       <span class="scale-label">ขนาด:</span>
-      <input
-        type="number"
-        :value="activeScale"
-        @input="handleScaleInput"
-        @blur="handleScaleBlur"
-        @keydown.enter="$event.target.blur()"
-        @keydown="preventInvalidChars"
-        class="size-input scale-input"
-        min="1"
-        step="1"
-      />
+      <input type="number" :value="activeScale" @input="handleScaleInput" @blur="handleScaleBlur"
+        @keydown.enter="$event.target.blur()" @keydown="preventInvalidChars" class="size-input scale-input" min="1"
+        step="1" />
       <span class="scale-unit"></span>
     </div>
 
@@ -202,15 +133,11 @@
       <div class="divider"></div>
 
       <div class="toolbar-group relative">
-        <button
-          @click.stop="
-            showSpacing = !showSpacing;
-            showOpacity = false;
-            showFontPicker = false;
-          "
-          class="dropdown-btn"
-          title="ระยะห่างตัวอักษรและบรรทัด"
-        >
+        <button @click.stop="
+          showSpacing = !showSpacing;
+        showOpacity = false;
+        showFontPicker = false;
+        " class="dropdown-btn" title="ระยะห่างตัวอักษรและบรรทัด">
           <span :class="showSpacing ? 'text-active' : 'text-muted'">ระยะห่าง</span>
           <span class="arrow">▾</span>
         </button>
@@ -218,27 +145,17 @@
         <div v-if="showSpacing" class="dropdown-menu spacing-menu" @click.stop>
           <div class="spacing-row">
             <label>ระยะระหว่างตัวอักษร</label>
-            <input
-              type="number"
-              class="size-input"
-              :value="Math.round(activeCharSpacing / 10)"
+            <input type="number" class="size-input" :value="Math.round(activeCharSpacing / 10)"
               @input="handleNumberInput('charSpacing', $event, 10)"
               @blur="handleNumberBlur('charSpacing', $event, activeCharSpacing, 10)"
-              @keydown.enter="$event.target.blur()"
-              step="1"
-            />
+              @keydown.enter="$event.target.blur()" step="1" />
           </div>
           <div class="spacing-row">
             <label>ระยะระหว่างบรรทัด</label>
-            <input
-              type="number"
-              class="size-input"
-              :value="activeLineHeight"
+            <input type="number" class="size-input" :value="activeLineHeight"
               @input="handleNumberInput('lineHeight', $event)"
-              @blur="handleNumberBlur('lineHeight', $event, activeLineHeight)"
-              @keydown.enter="$event.target.blur()"
-              step="0.1"
-            />
+              @blur="handleNumberBlur('lineHeight', $event, activeLineHeight)" @keydown.enter="$event.target.blur()"
+              step="0.1" />
           </div>
         </div>
       </div>
@@ -248,16 +165,9 @@
 
     <div class="toolbar-group">
       <button @click="deleteObject" class="delete-btn" title="ลบวัตถุ">
-        <svg
-          class="delete-icon"
-          width="16"
-          height="16"
-          viewBox="0 -960 960 960"
-          fill="currentColor"
-        >
+        <svg class="delete-icon" width="16" height="16" viewBox="0 -960 960 960" fill="currentColor">
           <path
-            d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
-          />
+            d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
         </svg>
         <span>ลบ</span>
       </button>
@@ -273,9 +183,6 @@ import { ref, shallowRef, onMounted, onUnmounted, triggerRef, computed, watch } 
 const props = defineProps({
   canvas: { type: Object, default: null }
 });
-
-
-
 
 const activeObject = shallowRef(null);
 const hasSelection = ref(false);
@@ -455,8 +362,6 @@ const isShape = computed(() => {
 
 const isSignature = computed(() => selectionCategory.value === 'block');
 
-
-
 const isMultiple = computed(() => {
   return activeObject.value?.type === 'activeSelection';
 });
@@ -614,8 +519,6 @@ const setOpacity = (val) => {
   showOpacity.value = false;
 };
 
-
-
 const deleteObject = () => {
   if (!activeObject.value || !props.canvas) return;
 
@@ -715,8 +618,6 @@ onUnmounted(() => {
   white-space: nowrap;
   flex-wrap: nowrap;
 }
-
-
 
 .scale-group {
   margin: 0 4px;

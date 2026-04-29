@@ -5,7 +5,6 @@ import prisma from '../../prismaClient';
 
 describe('Variables API Tests', () => {
     beforeAll(async () => {
-        // Seed some test data
         await prisma.variable.create({
             data: { key: 'TEST_KEY', label: 'Test Label' }
         });
@@ -27,7 +26,7 @@ describe('Variables API Tests', () => {
             const res = await request(app)
                 .post('/api/variables')
                 .send({ key: 'NEW_KEY', label: 'New Label' });
-            
+
             expect(res.status).toBe(200);
             expect(res.body.key).toBe('NEW_KEY');
             expect(res.body.label).toBe('New Label');

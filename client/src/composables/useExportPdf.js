@@ -1,5 +1,5 @@
 import { nextTick } from 'vue';
-import { CANVAS_CONSTANTS } from '../constants/canvas';
+import { CANVAS_CONSTANTS, CUSTOM_PROPS } from '../constants/canvas';
 import { yieldToMain } from '../utils/yieldToMain';
 import apiService from '../services/apiService';
 
@@ -8,11 +8,6 @@ import apiService from '../services/apiService';
  * Eliminates ~90% duplication between those two flows.
  */
 export function useExportPdf() {
-  const CUSTOM_PROPS = [
-    'id', 'selectable', 'name', 'textBaseline', 'angle',
-    'isSignatureBlock', 'isSignaturePrefix', 'isStampBlock',
-    'stampData', 'linkedId', 'sigData'
-  ];
 
   /**
    * Capture all canvas pages as data URL images.

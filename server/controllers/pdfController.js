@@ -594,7 +594,6 @@ const importLocalPath = async (req, res) => {
             /[\\/](\.ssh|\.env|\.git|node_modules)[\\/]?/i
         ];
 
-        // Check for directory traversal before resolving
         if (/\.\.[\\/]/.test(localPath)) {
             logger.warn(`[importLocalPath] Blocked path traversal attempt: ${localPath}`);
             return res.status(403).json({ error: 'Security Policy: เส้นทางไฟล์ไม่ได้รับอนุญาต' });
@@ -813,7 +812,7 @@ module.exports = {
     checkPdfType,
     generatePDF,
     importPdfUrl,
-    autoImportUniversal: importPdfUrl, // backward compat alias
+    autoImportUniversal: importPdfUrl,
     deletePdf,
     uploadPdf,
     getPdfById,

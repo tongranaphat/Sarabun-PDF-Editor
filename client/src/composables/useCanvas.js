@@ -1,26 +1,10 @@
 import { ref, shallowRef, computed } from 'vue';
 import { fabric } from 'fabric';
 import { v4 as uuidv4 } from 'uuid';
-import { CANVAS_CONSTANTS } from '../constants/canvas';
-
-
-const CUSTOM_PROPS = [
-  'id',
-  'selectable',
-  'name',
-  'textBaseline',
-  'angle',
-  'isSignatureBlock',
-  'isSignaturePrefix',
-  'isStampBlock',
-  'stampData',
-  'linkedId',
-  'sigData'
-];
-
-
-const MAX_HISTORY_SIZE = 30;
-const HISTORY_DEBOUNCE_MS = 300;
+import { CANVAS_CONSTANTS, CUSTOM_PROPS } from '../constants/canvas';
+import { useCanvasHistory } from './useCanvasHistory';
+import { useSignatureBlock } from './useSignatureBlock';
+import { useStampBlock } from './useStampBlock';
 
 export function useCanvas() {
   const _callbacks = {
@@ -38,9 +22,16 @@ export function useCanvas() {
   const zoomLevel = ref(1);
   const viewportRef = ref(null);
 
-  const historyStack = ref([]);
-  const redoStack = ref([]);
-  const isHistoryLocked = ref(false);
+  const historyCallbacks = {
+    get saveCurrentPageState() { return _callbacks.saveCurrentPageState; },
+    get renderAllPages() { return _callbacks.renderAllPages; },
+    get relinkSignatures() { return relinkSignatures; }
+  };
+  const {
+    historyStack, redoStack, isHistoryLocked,
+    saveHistory, undo, redo, resetHistory, setHistoryLock,
+    disposeHistory, canUndo, canRedo
+  } = useCanvasHistory(canvas, historyCallbacks);
 
   const initCanvas = () => {
     if (canvas.value) return;
@@ -111,147 +102,6 @@ export function useCanvas() {
     if (canvas.value) canvas.value.requestRenderAll();
   };
 
-  let saveHistoryTimeout = null;
-
-  const saveHistory = () => {
-    if (!canvas.value || isHistoryLocked.value) return;
-
-    if (saveHistoryTimeout) clearTimeout(saveHistoryTimeout);
-
-    saveHistoryTimeout = setTimeout(() => {
-      if (!canvas.value || isHistoryLocked.value) return;
-
-      const json = canvas.value.toJSON(CUSTOM_PROPS);
-      if (json.objects) {
-        json.objects = json.objects.filter(
-          (obj) => obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.id !== 'page-divider'
-        );
-      }
-      const jsonString = JSON.stringify(json);
-
-      if (
-        historyStack.value.length > 0 &&
-        historyStack.value[historyStack.value.length - 1] === jsonString
-      ) {
-        return;
-      }
-
-      historyStack.value.push(jsonString);
-
-      if (historyStack.value.length > MAX_HISTORY_SIZE) {
-        historyStack.value = historyStack.value.slice(-MAX_HISTORY_SIZE);
-      }
-
-      redoStack.value = [];
-    }, HISTORY_DEBOUNCE_MS);
-  };
-
-  const undo = () => {
-    if (historyStack.value.length > 1) {
-      isHistoryLocked.value = true;
-      const current = historyStack.value.pop();
-      redoStack.value.push(current);
-
-      const previous = historyStack.value[historyStack.value.length - 1];
-      restoreStateNoFlicker(previous);
-    }
-  };
-
-  const restoreStateNoFlicker = (jsonString) => {
-    if (!canvas.value) return;
-    const json = JSON.parse(jsonString);
-    const objectsToLoad = json.objects || [];
-
-    canvas.value.renderOnAddRemove = false;
-
-    const currentObjs = canvas.value.getObjects();
-    currentObjs.forEach((obj) => {
-      if (obj.id !== 'page-bg' && obj.id !== 'page-bg-image' && obj.id !== 'page-divider') {
-        canvas.value.remove(obj);
-      }
-    });
-
-    fabric.util.enlivenObjects(objectsToLoad, async (enlivenedObjects) => {
-      enlivenedObjects.forEach((obj) => {
-        canvas.value.add(obj);
-      });
-
-      canvas.value.renderOnAddRemove = true;
-      canvas.value.renderAll();
-
-      relinkSignatures();
-
-      if (typeof _callbacks.renderAllPages === 'function') {
-        await _callbacks.renderAllPages({ infraOnly: true });
-      }
-
-      if (typeof _callbacks.saveCurrentPageState === 'function')
-        _callbacks.saveCurrentPageState();
-
-      setTimeout(() => {
-        isHistoryLocked.value = false;
-      }, 100);
-    });
-  };
-
-  const redo = () => {
-    if (redoStack.value.length > 0) {
-      isHistoryLocked.value = true;
-      const next = redoStack.value.pop();
-      historyStack.value.push(next);
-
-      restoreStateNoFlicker(next);
-    }
-  };
-
-  const resetHistory = () => {
-    historyStack.value = [];
-    redoStack.value = [];
-  };
-
-  const wrapThaiText = (text, maxWidth, fontSize, fontFamily) => {
-    if (!text) return '';
-    if (!window.Intl || !Intl.Segmenter) return text;
-
-    const tempCanvas = document.createElement('canvas');
-    const ctx = tempCanvas.getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-
-    const segmenter = new Intl.Segmenter('th-TH', { granularity: 'word' });
-    const words = Array.from(segmenter.segment(text)).map((s) => s.segment);
-
-    let lines = [];
-    let currentLine = '';
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-
-      if (ctx.measureText(word).width <= maxWidth) {
-        const testLine = currentLine + word;
-        if (ctx.measureText(testLine).width > maxWidth && currentLine !== '') {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      } else {
-        for (let char of word) {
-          const testLineChar = currentLine + char;
-          if (ctx.measureText(testLineChar).width > maxWidth && currentLine !== '') {
-            lines.push(currentLine);
-            currentLine = char;
-          } else {
-            currentLine = testLineChar;
-          }
-        }
-      }
-    }
-
-    if (currentLine) lines.push(currentLine);
-
-    return lines.join('\n');
-  };
-
   if (!fabric.Object.prototype.__customExportPatched) {
     const originalToObject = fabric.Object.prototype.toObject;
     fabric.Object.prototype.toObject = function (additionalProperties) {
@@ -265,257 +115,13 @@ export function useCanvas() {
     fabric.Object.prototype.__customExportPatched = true;
   }
 
-  const linkSignatureBlocks = (canvasObj, prefixTextbox, sigGroup, GAP) => {
-    if (prefixTextbox.__isLinked) return;
-    prefixTextbox.__isLinked = true;
-    sigGroup.__isLinked = true;
-
-    let isSyncing = false;
-
-    const syncPositions = (movedObj) => {
-      if (isSyncing || prefixTextbox.group || sigGroup.group) return;
-      const activeObj = canvasObj.getActiveObject();
-      if (activeObj && activeObj.type === 'activeSelection') return;
-
-      isSyncing = true;
-      if (movedObj === prefixTextbox && sigGroup.canvas) {
-        sigGroup.set({
-          left: prefixTextbox.left,
-          top: prefixTextbox.top + prefixTextbox.getScaledHeight() + GAP
-        });
-        sigGroup.setCoords();
-      } else if (movedObj === sigGroup && prefixTextbox.canvas) {
-        prefixTextbox.set({
-          left: sigGroup.left,
-          top: sigGroup.top - prefixTextbox.getScaledHeight() - GAP
-        });
-        prefixTextbox.setCoords();
-      }
-      isSyncing = false;
-    };
-
-    const originalPrefixSet = prefixTextbox.set.bind(prefixTextbox);
-    prefixTextbox.set = function (...args) {
-      originalPrefixSet(...args);
-      if (!this.group) syncPositions(prefixTextbox);
-      return this;
-    };
-
-    const originalGroupSet = sigGroup.set.bind(sigGroup);
-    sigGroup.set = function (...args) {
-      originalGroupSet(...args);
-      if (!this.group) syncPositions(sigGroup);
-      return this;
-    };
-
-    prefixTextbox.on('moving', () => syncPositions(prefixTextbox));
-    prefixTextbox.on('resizing', () => syncPositions(prefixTextbox));
-    prefixTextbox.on('scaling', () => syncPositions(prefixTextbox));
-    sigGroup.on('moving', () => syncPositions(sigGroup));
-    sigGroup.on('scaling', () => syncPositions(sigGroup));
-
-    prefixTextbox.on('changed', () => {
-      syncPositions(prefixTextbox);
-      canvasObj.renderAll();
-    });
-
-    const handleDeletion = (deletedObj) => {
-      if (deletedObj.isDeleting) return;
-      deletedObj.isDeleting = true;
-      if (deletedObj === prefixTextbox && sigGroup.canvas) {
-        sigGroup.isDeleting = true;
-        canvasObj.remove(sigGroup);
-      } else if (deletedObj === sigGroup && prefixTextbox.canvas) {
-        prefixTextbox.isDeleting = true;
-        canvasObj.remove(prefixTextbox);
-      }
-    };
-
-    prefixTextbox.on('removed', () => handleDeletion(prefixTextbox));
-    sigGroup.on('removed', () => handleDeletion(sigGroup));
+  const blockCallbacks = {
+    get saveCurrentPageState() { return _callbacks.saveCurrentPageState; },
+    get saveHistory() { return saveHistory; },
+    get getPageScaleAtPos() { return getPageScaleAtPos; }
   };
-
-  const addSignatureBlockToCanvas = (
-    sigData,
-    dropX = 100,
-    dropY = 100,
-    customPrefixText = null
-  ) => {
-    if (!canvas.value) return;
-
-    const scale = getPageScaleAtPos(dropY);
-    const maxTextWidth = 165 * scale;
-    const fontSize = 15 * scale;
-    const fontFamily = 'Sarabun';
-    const GAP = 4 * scale;
-
-    const sharedLinkedId = `link_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-    const buildUnifiedSignatureGroup = (imgObj = null) => {
-      const objects = [];
-      let currentInternalY = 0;
-      const centerX = 0;
-
-      const balancer = new fabric.Rect({
-        left: centerX,
-        top: currentInternalY,
-        width: 165 * scale,
-        height: 1,
-        fill: 'transparent',
-        originX: 'center',
-        originY: 'top',
-        selectable: false,
-        evented: false
-      });
-      objects.push(balancer);
-
-      const textToShow = customPrefixText !== null ? customPrefixText : sigData.prefixText;
-
-      if (textToShow && textToShow.trim() !== '') {
-        let prefixFontSize = fontSize;
-        if (textToShow.length >= 60) {
-          prefixFontSize = fontSize - 2 * scale;
-        } else if (textToShow.length >= 35) {
-          prefixFontSize = fontSize - 1 * scale;
-        }
-
-        const wrappedPrefix =
-          typeof wrapThaiText === 'function'
-            ? wrapThaiText(textToShow, maxTextWidth, prefixFontSize, fontFamily)
-            : textToShow;
-
-        const prefixTextbox = new fabric.Textbox(wrappedPrefix, {
-          left: centerX,
-          top: currentInternalY,
-          fontSize: prefixFontSize,
-          fontFamily: fontFamily,
-          textAlign: 'center',
-          width: maxTextWidth + 15 * scale,
-          originX: 'center',
-          originY: 'top',
-          fill: '#003399',
-          editable: false,
-          selectable: false,
-          evented: false
-        });
-        objects.push(prefixTextbox);
-        currentInternalY += prefixTextbox.getScaledHeight() + GAP + 8 * scale;
-      }
-
-      if (imgObj) {
-        imgObj.scaleToHeight(45 * scale);
-        imgObj.set({
-          originX: 'center',
-          originY: 'top',
-          top: currentInternalY,
-          left: centerX,
-          selectable: false,
-          evented: false
-        });
-        objects.push(imgObj);
-        currentInternalY += imgObj.getScaledHeight() + 5 * scale;
-      } else {
-        currentInternalY += 45 * scale;
-      }
-
-      const nameText = new fabric.Text(`( ${sigData.fullName} )`, {
-        fontSize: fontSize,
-        fontFamily: fontFamily,
-        originX: 'center',
-        originY: 'top',
-        top: currentInternalY,
-        left: centerX,
-        fill: '#003399',
-        selectable: false,
-        evented: false
-      });
-      objects.push(nameText);
-      currentInternalY += nameText.height + 4 * scale;
-
-      if (sigData.position) {
-        const wrappedPos =
-          typeof wrapThaiText === 'function'
-            ? wrapThaiText(sigData.position, maxTextWidth, fontSize, fontFamily)
-            : sigData.position;
-
-        const bottomText = new fabric.Text(wrappedPos, {
-          fontSize: fontSize,
-          fontFamily: fontFamily,
-          originX: 'center',
-          originY: 'top',
-          textAlign: 'center',
-          top: currentInternalY,
-          left: centerX,
-          fill: '#003399',
-          selectable: false,
-          evented: false
-        });
-        objects.push(bottomText);
-      }
-
-      const unifiedGroup = new fabric.Group(objects, {
-        left: dropX,
-        top: dropY,
-        originX: 'center',
-        originY: 'top',
-        isSignatureBlock: true,
-        sigData: sigData,
-        id: `signature_${sharedLinkedId}`,
-        name: `ลายเซ็น: ${sigData.fullName}`,
-        subTargetCheck: false
-      });
-
-      canvas.value.add(unifiedGroup);
-      canvas.value.setActiveObject(unifiedGroup);
-      canvas.value.requestRenderAll();
-
-      if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
-      saveHistory();
-    };
-
-    if (sigData.signatureImage) {
-      let imageUrl = sigData.signatureImage;
-      if (imageUrl.includes('uploads/')) {
-        const backendPort = import.meta.env.VITE_API_PORT || '4011';
-        const protocol = window.location.protocol;
-        const hostname = window.location.hostname;
-        if (!imageUrl.startsWith('/')) imageUrl = '/' + imageUrl;
-        imageUrl = `${protocol}//${hostname}:${backendPort}${imageUrl}`;
-      }
-
-      fabric.Image.fromURL(
-        imageUrl,
-        (img, isError) => {
-          if (!isError && img) buildUnifiedSignatureGroup(img);
-          else buildUnifiedSignatureGroup();
-        },
-        { crossOrigin: 'anonymous' }
-      );
-    } else {
-      buildUnifiedSignatureGroup();
-    }
-  };
-
-  const relinkSignatures = () => {
-    if (!canvas.value) return;
-    const objects = canvas.value.getObjects();
-    const pairs = {};
-
-    objects.forEach((obj) => {
-      if (obj.linkedId) {
-        if (!pairs[obj.linkedId]) pairs[obj.linkedId] = {};
-        if (obj.isSignaturePrefix) pairs[obj.linkedId].prefix = obj;
-        if (obj.isSignatureBlock) pairs[obj.linkedId].group = obj;
-      }
-    });
-
-    Object.values(pairs).forEach((pair) => {
-      if (pair.prefix && pair.group) {
-        const GAP = pair.group.sigData?.signatureImage ? 3 : 3;
-        linkSignatureBlocks(canvas.value, pair.prefix, pair.group, GAP);
-      }
-    });
-  };
+  const { addSignatureBlockToCanvas, relinkSignatures } = useSignatureBlock(canvas, blockCallbacks);
+  const { addStampBlockToCanvas } = useStampBlock(canvas, blockCallbacks);
 
   const getPageScaleAtPos = (y) => {
     if (!canvas.value) return 1;
@@ -534,135 +140,6 @@ export function useCanvas() {
 
     bgObjects.sort((a, b) => a.top - b.top);
     return bgObjects[0].getScaledWidth() / CANVAS_CONSTANTS.PAGE_WIDTH;
-  };
-
-  const addStampBlockToCanvas = (metadata) => {
-    if (!canvas.value) return;
-
-    const { schoolName, seqNo, date, time, receiverName } = metadata;
-
-    const allBgObjects = canvas.value
-      .getObjects()
-      .filter((o) => o.id === 'page-bg' || o.id === 'page-bg-image');
-    let scale = 1;
-    let firstPage = null;
-    if (allBgObjects.length > 0) {
-      allBgObjects.sort((a, b) => a.top - b.top);
-      firstPage = allBgObjects[0];
-      scale = firstPage.getScaledWidth() / CANVAS_CONSTANTS.PAGE_WIDTH;
-    }
-
-    const objects = [];
-    const fontFamily = 'Sarabun';
-    const fontSize = 13 * scale;
-    let currentY = 12 * scale;
-
-    const fieldsData = [
-      { label: 'เลขที่รับ', val: String(seqNo || '') },
-      { label: 'วันที่', val: date || '' },
-      { label: 'เวลา', val: time || '' },
-      { label: 'ผู้รับ', val: receiverName || '' }
-    ];
-
-    let maxValWidth = 45 * scale;
-    const labels = [];
-    const values = [];
-
-    fieldsData.forEach((field) => {
-      const labelItem = new fabric.Text(field.label, { fontSize, fontFamily, fill: '#003399' });
-      const valItem = new fabric.Text(field.val, {
-        fontSize: fontSize + 1 * scale,
-        fontFamily,
-        fill: '#003399'
-      });
-      labels.push(labelItem);
-      values.push(valItem);
-      if (valItem.width > maxValWidth) {
-        maxValWidth = valItem.width;
-      }
-    });
-
-    const dynamicBoxWidth = 55 * scale + maxValWidth + 5 * scale;
-    const blockWidth = Math.max(145 * scale, dynamicBoxWidth);
-
-    const displaySchoolName = schoolName || 'โรงเรียนทดสอบ';
-    let schoolFontSize = fontSize + 1 * scale;
-    if (displaySchoolName.length >= 40) {
-      schoolFontSize = fontSize - 1.5 * scale;
-    } else if (displaySchoolName.length >= 25) {
-      schoolFontSize = fontSize - 0.5 * scale;
-    }
-
-    const schoolText = new fabric.Text(displaySchoolName, {
-      fontSize: schoolFontSize,
-      fontFamily: fontFamily,
-      fontWeight: 'bold',
-      fill: '#003399',
-      left: blockWidth / 2,
-      top: currentY,
-      originX: 'center',
-      originY: 'top'
-    });
-    objects.push(schoolText);
-    currentY += schoolText.height + 6 * scale;
-
-    for (let i = 0; i < fieldsData.length; i++) {
-      const labelItem = labels[i];
-      const valItem = values[i];
-
-      labelItem.set({ left: 6 * scale, top: currentY });
-      const valCenter = 55 * scale + (blockWidth - 6 * scale - 55 * scale) / 2;
-      valItem.set({
-        left: valCenter,
-        top: currentY - 1 * scale,
-        originX: 'center',
-        originY: 'top'
-      });
-
-      objects.push(labelItem, valItem);
-      currentY += Math.max(labelItem.height, valItem.height) + 6 * scale;
-    }
-
-    const frame = new fabric.Rect({
-      left: 0,
-      top: 0,
-      width: blockWidth,
-      height: currentY + 3 * scale,
-      fill: 'transparent',
-      stroke: '#003399',
-      strokeWidth: 1.2,
-      rx: 2 * scale,
-      ry: 2 * scale
-    });
-    objects.unshift(frame);
-
-    let dropX = CANVAS_CONSTANTS.PAGE_WIDTH - blockWidth - 95 * scale;
-    let dropY = 40 * scale;
-
-    if (firstPage) {
-      dropX = firstPage.left + firstPage.getScaledWidth() - blockWidth - 95 * scale;
-      dropY = firstPage.top + 40 * scale;
-    }
-
-    const stampGroup = new fabric.Group(objects, {
-      left: dropX,
-      top: dropY,
-      originX: 'left',
-      originY: 'top',
-      isSignatureBlock: true,
-      isStampBlock: true,
-      stampData: metadata,
-      id: `stamp_${Date.now()}`,
-      name: `บล็อกเลขที่รับ`
-    });
-
-
-    canvas.value.add(stampGroup);
-    canvas.value.setActiveObject(stampGroup);
-    canvas.value.requestRenderAll();
-
-    if (typeof _callbacks.saveCurrentPageState === 'function') _callbacks.saveCurrentPageState();
-    saveHistory();
   };
 
 
@@ -702,90 +179,6 @@ export function useCanvas() {
     }
   };
 
-
-  const saveCurrentPageStateAtomic = (canvas, pages, zoomLevel) => {
-    if (!canvas || !pages) return;
-
-    const pageObjectMap = new Map();
-    pages.forEach((page, index) => {
-      pageObjectMap.set(index, []);
-    });
-
-    const objects = [...canvas.getObjects()];
-    objects.forEach((obj) => {
-      if (!obj.nodeId && obj.id !== 'page-bg' && obj.id !== 'page-bg-image') {
-        canvas.remove(obj);
-      }
-    });
-
-    const allObjects = canvas.getObjects();
-
-    let globalMaxWidth = 0;
-    pages.forEach((p) => {
-      const w = p.width || CANVAS_CONSTANTS.PAGE_WIDTH;
-      if (w > globalMaxWidth) globalMaxWidth = w;
-    });
-
-    allObjects.forEach((obj) => {
-      if (!obj || obj.id === 'page-bg' || obj.id === 'page-bg-image') return;
-      if (typeof obj.top !== 'number' || isNaN(obj.top)) return;
-
-      let exportLeft = obj.left;
-      let exportTop = obj.top;
-      if (obj.originX === 'center') exportLeft = obj.left - (obj.width * obj.scaleX) / 2;
-      if (obj.originY === 'center') exportTop = obj.top - (obj.height * obj.scaleY) / 2;
-
-      const center = obj.getCenterPoint();
-      let accumulatedTop = 0;
-      let targetPageIndex = pages.length - 1;
-      let pageTopY = 0;
-
-      for (let i = 0; i < pages.length; i++) {
-        const pageH = pages[i]?.height || CANVAS_CONSTANTS.PAGE_HEIGHT;
-        const pageBottom = accumulatedTop + pageH + CANVAS_CONSTANTS.PAGE_GAP;
-        if (center.y >= accumulatedTop && center.y < pageBottom) {
-          targetPageIndex = i;
-          pageTopY = accumulatedTop;
-          break;
-        }
-        accumulatedTop = pageBottom;
-      }
-
-      const pageIndex = Math.max(0, Math.min(targetPageIndex, pages.length - 1));
-      if (pageTopY === 0 && pageIndex > 0) {
-        let tmpOffset = 0;
-        for (let i = 0; i < pageIndex; i++) {
-          tmpOffset +=
-            (pages[i]?.height || CANVAS_CONSTANTS.PAGE_HEIGHT) + CANVAS_CONSTANTS.PAGE_GAP;
-        }
-        pageTopY = tmpOffset;
-      }
-
-      try {
-        const serialized = obj.toObject(CUSTOM_PROPS);
-
-        const targetPageWidth = pages[pageIndex]?.width || CANVAS_CONSTANTS.PAGE_WIDTH;
-        const pageOffsetLeft = (globalMaxWidth - targetPageWidth) / 2;
-
-        serialized.left = Math.round((exportLeft - pageOffsetLeft) * 100) / 100;
-        serialized.top = Math.round((exportTop - pageTopY) * 100) / 100;
-        serialized.width = Math.round((obj.width || 0) * 100) / 100;
-        serialized.height = Math.round((obj.height || 0) * 100) / 100;
-        serialized.angle = obj.angle || 0;
-
-        if (serialized.textBaseline === 'alphabetical') serialized.textBaseline = 'alphabetic';
-
-        pageObjectMap.get(pageIndex).push(serialized);
-      } catch (e) {
-        console.error('Failed to serialize object:', e);
-      }
-    });
-
-    return pages.map((page, index) => ({
-      ...page,
-      objects: pageObjectMap.get(index) || []
-    }));
-  };
 
   const capturePageAsImage = (pageIndex, pageHeight, pageGap, multiplier = 2) => {
     try {
@@ -927,7 +320,6 @@ export function useCanvas() {
     zoomLevel.value = 1;
   };
 
-
   const periodicCleanup = (canvas, intervalMs = 30000) => {
     let cleanupInterval = null;
 
@@ -960,10 +352,6 @@ export function useCanvas() {
     return { startCleanup, stopCleanup };
   };
 
-  const setHistoryLock = (status) => {
-    isHistoryLocked.value = status;
-  };
-
   const updateCanvasDimensions = () => {
     if (canvas.value) {
       canvas.value.calcOffset();
@@ -972,10 +360,7 @@ export function useCanvas() {
   };
 
   const dispose = () => {
-    if (saveHistoryTimeout) {
-      clearTimeout(saveHistoryTimeout);
-      saveHistoryTimeout = null;
-    }
+    disposeHistory();
 
     if (canvas.value) {
       try {
@@ -986,9 +371,6 @@ export function useCanvas() {
       }
       canvas.value = null;
     }
-
-    historyStack.value = [];
-    redoStack.value = [];
 
     _callbacks.saveCurrentPageState = null;
     _callbacks.forceUnlockObject = null;
@@ -1008,8 +390,8 @@ export function useCanvas() {
     setHistoryLock,
     setHistoryContext: () => { },
     setCallbacks,
-    canUndo: computed(() => historyStack.value.length > 1),
-    canRedo: computed(() => redoStack.value.length > 0),
+    canUndo,
+    canRedo,
 
     initCanvas,
     removeSelectedObject,
@@ -1024,7 +406,7 @@ export function useCanvas() {
     cleanupCanvasObjects,
     periodicCleanup,
 
-    saveCurrentPageStateAtomic,
+
 
     render,
     dispose,

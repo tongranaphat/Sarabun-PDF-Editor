@@ -176,7 +176,7 @@ export function useRouteHandler(deps) {
    * Handle /pdf/:id route
    */
   const handlePdfIdRoute = async (currentPath) => {
-    const pdfMatch = currentPath.match(/^\/pdf\/([a-zA-Z0-9-]+)/i);
+    const pdfMatch = currentPath.match(/^\/pdf\/([a-zA-Z0-9-_]+)/i);
     if (!pdfMatch?.[1]) return false;
 
     try {
@@ -192,7 +192,7 @@ export function useRouteHandler(deps) {
    * Handle /history/:id route
    */
   const handleHistoryRoute = async (currentPath) => {
-    const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-]+)/i);
+    const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-_]+)/i);
     if (!historyMatch?.[1]) return false;
 
     try {

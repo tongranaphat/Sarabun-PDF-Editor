@@ -70,6 +70,20 @@ app.use(
     express.static(uploadsDir)
 );
 
+const uploadSampleDir = path.join(__dirname, 'upload_sample');
+if (fs.existsSync(uploadSampleDir)) {
+    app.use(
+        '/upload_sample',
+        (req, res, next) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+            next();
+        },
+        express.static(uploadSampleDir)
+    );
+}
+
 app.get('/', (req, res) => {
     res.status(200).json({
         status: 'success',

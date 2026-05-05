@@ -226,7 +226,7 @@ export function useSignatureBlock(canvas, callbacks = {}) {
 
     if (sigData.signatureImage) {
       let imageUrl = sigData.signatureImage;
-      if (imageUrl.includes('uploads/')) {
+      if (imageUrl.includes('uploads/') || imageUrl.includes('upload_sample/')) {
         const backendPort = import.meta.env.VITE_API_PORT || '4011';
         const protocol = window.location.protocol;
         const hostname = window.location.hostname;

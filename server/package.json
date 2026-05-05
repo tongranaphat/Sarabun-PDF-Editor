@@ -7,7 +7,10 @@
         "start": "node index.js",
         "dev": "nodemon index.js",
         "lint": "eslint . --fix",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "generate": "prisma generate",
+        "db:push": "prisma db push",
+        "db:seed": "prisma db seed"
     },
     "keywords": [],
     "author": "",

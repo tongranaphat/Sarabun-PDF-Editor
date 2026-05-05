@@ -20,5 +20,5 @@ RUN npx prisma generate
 ARG SERVER_PORT=4011
 EXPOSE ${SERVER_PORT}
 
-# Auto-sync database schema on startup for development convenience
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss 2>&1 || echo 'Prisma push warning'; exec node index.js"]
+# Sync database schema without losing data, then start the server
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npx prisma db seed && exec node index.js"]

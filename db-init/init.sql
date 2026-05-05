@@ -99,6 +99,4 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
-INSERT INTO public."Signatory" (id, "fullName", "signatureImage", "variableName", "prefixText", "position", "createdAt") VALUES
-('8c86513f-50f3-42aa-b4a8-4df5610dd020', 'นายเทสเตอร์ ทดลองระบบ', '/uploads/signatures/signature (2).png', '{{test_sig}}', 'ขอมอบหมายให้ไปทดลองระบบ', 'นักทดลองระบบ', '2026-04-01 03:14:37.428')
-ON CONFLICT (id) DO NOTHING;
+

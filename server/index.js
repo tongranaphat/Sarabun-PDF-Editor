@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 
 const { PrismaClient } = require('@prisma/client');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const prisma = require('./prismaClient');
 
 

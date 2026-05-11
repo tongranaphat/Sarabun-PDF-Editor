@@ -289,6 +289,8 @@ export function useDocument(canvas, zoomLevel, canvasHelpers = {}) {
                         const formData = new FormData();
                         formData.append('OriginalFileId', savedFileId);
                         formData.append('editState', JSON.stringify(pagesData));
+                        formData.append('createdBy', editorStore.jwtUserId || '');
+                        formData.append('createdByType', editorStore.jwtUserType || '');
                         await apiService.savePdfState(formData);
                       } catch (err) {
                         console.error('Failed to auto-save stamp block', err);

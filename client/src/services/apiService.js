@@ -37,14 +37,66 @@ api.interceptors.response.use(
   }
 );
 
+const SdcApi = axios.create({
+  baseURL: 'http://10.0.0.99/api/service',
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'Authorization': 'basic REDACTED_CREDENTIAL'
+  }
+});
+
+const SdcApiUpload = axios.create({
+  baseURL: 'http://10.0.0.99/api/service',
+  headers: {
+    'Accept': 'application/json',
+    'Authorization': 'basic REDACTED_CREDENTIAL'
+  }
+});
+
 export const apiService = {
+  async decodeToken(token) {
+    const response = await api.post('/auth/decode-token', { token });
+    return response.data;
+  },
+
+  async getSarabanDocFileDetail(id) {
+    const response = await SdcApi.get(`/saraban-doc/file-detail/${id}`);
+    return response.data;
+  },
+
+  async savePdfToSdc(sdcId, fileBlob, fileName) {
+    if (import.meta.env.VITE_SDC_DRY_RUN === 'true') {
+      console.log('[SDC DRY RUN] savePdfToSdc called — not sending to real server');
+      console.log('[SDC DRY RUN] sdcId:', sdcId);
+      console.log('[SDC DRY RUN] fileName:', fileName || 'document.pdf');
+      console.log('[SDC DRY RUN] fileSize:', fileBlob.size, 'bytes');
+      return { dry_run: true, sdcId, fileName };
+    }
+    const formData = new FormData();
+    formData.append('file', fileBlob, fileName || 'document.pdf');
+    const response = await SdcApiUpload.post(
+      `/saraban-doc/save-pdf-sign/${sdcId}`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    const data = response.data;
+    return data.saraban_doc_sign_attach || data.saraban_doc || data;
+  },
+
   async getVariables() {
     const response = await api.get('/variables');
     return response.data;
   },
 
-  async getSignatories() {
-    const response = await api.get('/signatories');
+  async getSignatories(documentId) {
+    const url = documentId ? `/signatories?documentId=${documentId}` : '/signatories';
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async importSignatories(transactions, documentId) {
+    const response = await api.post('/signatories/import', { transactions, documentId });
     return response.data;
   },
 
@@ -113,4 +165,4 @@ export const apiService = {
 };
 
 export default apiService;
-export { api };
+export { api, SdcApi, SdcApiUpload };

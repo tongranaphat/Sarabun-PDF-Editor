@@ -22,6 +22,7 @@ out
 
 # Environment Variables
 .env
+.env-dev
 
 # Editor directories and files
 .vscode/*
@@ -69,3 +70,6 @@ docker-compose.override.yml
 
 ehthumbs.db
 [Dd]esktop.ini
+
+# Development
+server/jwt-playground.js

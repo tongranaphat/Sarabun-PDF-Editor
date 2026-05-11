@@ -38,6 +38,8 @@ model PdfCache {
   TempFilePath      String?
   editState         Json?
   EditedFilePath    String?
+  createdBy         String?
+  createdByType     String?
   createdAt         DateTime @default(now())
   lastEditAt        DateTime @updatedAt
   stampConfig       StampConfig?
@@ -54,6 +56,7 @@ model Signatory {
   variableName   String   @unique
   prefixText     String?  
   position       String?  
+  documentId     String?  
   createdAt      DateTime @default(now())
 }
 

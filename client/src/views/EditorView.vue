@@ -4,7 +4,7 @@
       @undo="undo" @redo="redo" @zoom-in="zoomIn" @zoom-out="zoomOut" @save-report="handleSaveProject"
       @generate-pdf="handleExport" @reset-project="handleReset" @update:pdfQuality="pdfQuality = $event" />
 
-    <Sidebar :isOpen="isSidebarOpen" :isCanvasReady="isCanvasReady" :pages="pages" :currentPageIndex="currentPageIndex"
+    <Sidebar ref="sidebarRef" :isOpen="isSidebarOpen" :isCanvasReady="isCanvasReady" :pages="pages" :currentPageIndex="currentPageIndex"
       :pdfId="currentPdfId" @toggle="toggleSidebar" @open="isSidebarOpen = true" @close="isSidebarOpen = false"
       @reset-canvas="goHome" @import-workspace="handleImportWorkspaceWrapper" @delete-page="handleDeletePage"
       @page-click="handleScrollToPage" @page-drop="handlePageDropWrapper" @add-signature-block="handleAddSignatureBlock"
@@ -86,6 +86,8 @@ const updateExportProgress = (current, stage = '') => {
 };
 const hideExportOverlay = () => { exportOverlay.value.visible = false; };
 
+const sidebarRef = ref(null);
+
 const signatureModal = ref({ visible: false, data: null });
 const fileNameModal = ref({ visible: false, defaultName: '' });
 let fileNameResolver = null;
@@ -153,10 +155,11 @@ const resetCanvasWrapper = async () => {
   isDocumentLoading.value = false;
 };
 
-const handleRefreshStamp = async () => {
-  if (!currentPdfId.value || !canvas.value) return;
+const handleRefreshStamp = async (explicitId) => {
+  const targetId = explicitId && typeof explicitId === 'string' ? explicitId : currentPdfId.value;
+  if (!targetId || targetId === 'undefined' || !canvas.value) return;
   await autoAddStamp(
-    currentPdfId.value, addStampBlockToCanvas,
+    targetId, addStampBlockToCanvas,
     saveCurrentPageState, preparePagesForSave,
     { refreshExisting: true, canvasRef: canvas }
   );
@@ -169,7 +172,12 @@ const routeHandler = useRouteHandler({
   addStampBlockToCanvas, resetCanvasWrapper, resetCanvas,
   processPdfToImages, renderAllPages, autoFitZoom,
   sanitizePagesData, resetHistory, handleRefreshStamp,
-  autoAddStamp, hasStampInState, saveCurrentPageState, preparePagesForSave
+  autoAddStamp, hasStampInState, saveCurrentPageState, preparePagesForSave,
+  onSignatoriesImported: (newPdfId) => {
+    if (sidebarRef.value && typeof sidebarRef.value.loadSignatories === 'function') {
+      sidebarRef.value.loadSignatories(newPdfId);
+    }
+  }
 });
 
 const triggerTempCleanup = () => {
@@ -201,6 +209,9 @@ watch(zoomLevel, async (newZoom, oldZoom) => {
 const goHome = () => {
   triggerTempCleanup();
   if (typeof window !== 'undefined' && window.history) window.history.pushState({}, '', '/');
+  if (sidebarRef.value && typeof sidebarRef.value.clearSignatories === 'function') {
+    sidebarRef.value.clearSignatories();
+  }
   resetCanvasWrapper();
 };
 
@@ -213,7 +224,20 @@ const handleReset = async () => {
   if (confirm('ข้อมูลทั้งหมดที่เคยแก้ไขจะหายไปทั้งหมด แน่ใจหรือไม่?')) {
     try {
       showNotification('กำลังรีเซ็ตข้อมูล...', 'info');
-      await apiService.resetToOriginal(fileIdToReset);
+      const resetResult = await apiService.resetToOriginal(fileIdToReset);
+
+      const sdcId = routeHandler.getActiveSdcId();
+      if (sdcId && resetResult.tempPath) {
+        try {
+          showNotification('กำลังรีเซ็ตไฟล์ในระบบสารบรรณ...', 'info');
+          const originalBlob = await apiService.downloadBlob(resetResult.tempPath);
+          await apiService.savePdfToSdc(sdcId, originalBlob, `original_${fileIdToReset}.pdf`);
+        } catch (sdcError) {
+          console.error('Reset to SDC failed:', sdcError);
+          showNotification('รีเซ็ตในระบบสารบรรณไม่สำเร็จ', 'warning');
+        }
+      }
+
       alert('รีเซ็ตสำเร็จ! ระบบกำลังโหลดไฟล์ต้นฉบับใหม่...');
       window.location.reload();
     } catch (error) {
@@ -292,7 +316,22 @@ const handleSaveProject = async (isSilent = false) => {
       formData.append('OriginalFileId', fileIdToSave);
       formData.append('editState', JSON.stringify(pages.value));
       formData.append('pdfFile', pdfBlob, `edited_${fileIdToSave}.pdf`);
+      formData.append('createdBy', editorStore.jwtUserId || '');
+      formData.append('createdByType', editorStore.jwtUserType || '');
+      
+      console.log('[Save] Sending state with identity metadata');
       await apiService.savePdfState(formData);
+
+      const sdcId = routeHandler.getActiveSdcId();
+      if (sdcId) {
+        try {
+          if (!isSilent) updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไปยังระบบสารบรรณ...');
+          await apiService.savePdfToSdc(sdcId, pdfBlob, `edited_${fileIdToSave}.pdf`);
+        } catch (sdcError) {
+          console.error('Save to SDC failed:', sdcError);
+          if (!isSilent) showNotification('บันทึกไปยังระบบสารบรรณไม่สำเร็จ', 'warning');
+        }
+      }
 
       if (!isSilent) showNotification('บันทึกไฟล์เรียบร้อย!', 'success');
       saveHistory();
@@ -338,9 +377,39 @@ const handleExport = async () => {
       await yieldToMain();
 
       const pdfBlob = await generateHybridPdfBlob(canvasImages, exportProjectData, variableMap, null, 'report', 'flatten');
+
+      const pathSegments = window.location.pathname.split('/');
+      const fileIdToSave = pathSegments[pathSegments.length - 1];
+      if (fileIdToSave && fileIdToSave !== 'undefined' && fileIdToSave !== 'pdf') {
+        updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไปยังเซิร์ฟเวอร์...');
+        await yieldToMain();
+        try {
+          const formData = new FormData();
+          formData.append('OriginalFileId', fileIdToSave);
+          formData.append('editState', JSON.stringify(pages.value));
+          formData.append('pdfFile', pdfBlob, `edited_${fileIdToSave}.pdf`);
+          formData.append('createdBy', editorStore.jwtUserId || '');
+          formData.append('createdByType', editorStore.jwtUserType || '');
+          
+          console.log('[Export] Auto-saving state with identity metadata');
+          await apiService.savePdfState(formData);
+
+          const sdcId = routeHandler.getActiveSdcId();
+          if (sdcId) {
+            try {
+              await apiService.savePdfToSdc(sdcId, pdfBlob, `edited_${fileIdToSave}.pdf`);
+            } catch (sdcError) {
+              console.error('Save to SDC during export failed:', sdcError);
+              showNotification('บันทึกไปยังระบบสารบรรณไม่สำเร็จ', 'warning');
+            }
+          }
+        } catch (saveError) {
+          console.error('Auto-save during export failed:', saveError);
+          showNotification('ไม่สามารถบันทึกไปยังเซิร์ฟเวอร์อัตโนมัติได้', 'warning');
+        }
+      }
+
       hideExportOverlay();
-      updateExportProgress(pages.value.length + 2, 'กำลังบันทึกไฟล์...');
-      await yieldToMain();
 
       let finalFileName = documentTitle.value || 'report';
       if (!window.showSaveFilePicker) {

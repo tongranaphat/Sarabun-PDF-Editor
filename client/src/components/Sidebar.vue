@@ -99,12 +99,31 @@ import apiService from '../services/apiService';
 
 const signatories = ref([]);
 
-onMounted(async () => {
+const loadSignatories = async (explicitPdfId) => {
   try {
-    signatories.value = await apiService.getSignatories();
+    const idToUse = explicitPdfId || props.pdfId;
+    const documentId = idToUse && idToUse !== 'pdf' ? idToUse : null;
+    signatories.value = await apiService.getSignatories(documentId);
   } catch (error) {
     console.error('Failed to load signatories:', error);
   }
+};
+
+const clearSignatories = async () => {
+  try {
+    signatories.value = await apiService.getSignatories(null);
+  } catch (error) {
+    console.error('Failed to load global signatories:', error);
+  }
+};
+
+onMounted(() => {
+  loadSignatories();
+});
+
+defineExpose({
+  loadSignatories,
+  clearSignatories
 });
 
 const activeTab = ref('pages');

@@ -1,10 +1,7 @@
 import { nextTick } from 'vue';
 import apiService from '../services/apiService';
+import { useEditorStore } from '../stores/editorStore';
 
-/**
- * Handles URL-based routing for importing and loading PDFs.
- * Extracted from EditorView.vue's 450+ line handleRouteChange function.
- */
 export function useRouteHandler(deps) {
   const {
     pages,
@@ -29,16 +26,40 @@ export function useRouteHandler(deps) {
     preparePagesForSave
   } = deps;
 
+  const editorStore = useEditorStore();
+
   let activePdfId = null;
+  let activeSdcId = null;
 
   const getActivePdfId = () => activePdfId;
+  const getActiveSdcId = () => activeSdcId;
 
-  /**
-   * Load a workspace by file ID — handles both restored state and fresh PDF.
-   */
   const loadWorkspace = async (fileId) => {
     activePdfId = fileId;
     const workspaceData = await apiService.prepareWorkspace(fileId);
+
+    if (workspaceData.originalUrl) {
+      const match = workspaceData.originalUrl.match(/[?&]sdcId=(\d+)/);
+      if (match && match[1]) {
+        activeSdcId = match[1];
+        const sdcId = match[1];
+        try {
+          const docDetail = await apiService.getSarabanDocFileDetail(sdcId);
+          if (docDetail && docDetail.transactions && Array.isArray(docDetail.transactions) && docDetail.transactions.length > 0) {
+            const transactionsData = docDetail.transactions.map(t => ({
+              fullName: t.created_by_name,
+              prefixText: t.note
+            }));
+            await apiService.importSignatories(transactionsData, fileId);
+            if (typeof deps.onSignatoriesImported === 'function') {
+              deps.onSignatoriesImported(fileId);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to re-fetch transactions for sdcId:", sdcId, err);
+        }
+      }
+    }
 
     if (workspaceData.editState) {
       let parsedState = workspaceData.editState;
@@ -53,7 +74,7 @@ export function useRouteHandler(deps) {
       await new Promise((r) =>
         setTimeout(async () => {
           if (typeof renderAllPages === 'function') await renderAllPages();
-          if (stampExists) handleRefreshStamp();
+          if (stampExists) handleRefreshStamp(fileId);
           r();
         }, 500)
       );
@@ -84,9 +105,6 @@ export function useRouteHandler(deps) {
     }
   };
 
-  /**
-   * Handle direct URL import (e.g., /https://example.com/file.pdf)
-   */
   const handleDirectUrlImport = async (fullHref) => {
     const directUrlMatch = fullHref.match(/\/(https?:\/\/.+)/i) || fullHref.match(/\/(https?:\/.+)/i);
     if (!directUrlMatch?.[1]) return false;
@@ -112,9 +130,6 @@ export function useRouteHandler(deps) {
     return false;
   };
 
-  /**
-   * Handle local file path import (e.g., /C:\path\to\file.pdf)
-   */
   const handleLocalPathImport = async (decodedPath) => {
     const localPathMatch = decodedPath.match(/^\/(["']?[A-Za-z]:[\\\/].+)/);
     if (!localPathMatch?.[1]) return false;
@@ -135,9 +150,6 @@ export function useRouteHandler(deps) {
     return false;
   };
 
-  /**
-   * Handle filepath query param (e.g., /path/uploads/cache/file.pdf)
-   */
   const handleFilePathParam = async (currentPath) => {
     const urlParams = new URLSearchParams(window.location.search);
     const openMatch = currentPath.match(/^\/path\/(.+)/i);
@@ -172,9 +184,6 @@ export function useRouteHandler(deps) {
     return true;
   };
 
-  /**
-   * Handle /pdf/:id route
-   */
   const handlePdfIdRoute = async (currentPath) => {
     const pdfMatch = currentPath.match(/^\/pdf\/([a-zA-Z0-9-_]+)/i);
     if (!pdfMatch?.[1]) return false;
@@ -188,9 +197,6 @@ export function useRouteHandler(deps) {
     return true;
   };
 
-  /**
-   * Handle /history/:id route
-   */
   const handleHistoryRoute = async (currentPath) => {
     const historyMatch = currentPath.match(/^\/history\/([a-zA-Z0-9-_]+)/i);
     if (!historyMatch?.[1]) return false;
@@ -216,9 +222,6 @@ export function useRouteHandler(deps) {
     return true;
   };
 
-  /**
-   * Handle home route (/)
-   */
   const handleHomeRoute = async (currentPath) => {
     if (currentPath !== '/' && currentPath !== '') return false;
     try {
@@ -229,10 +232,66 @@ export function useRouteHandler(deps) {
     return true;
   };
 
-  /**
-   * Main route change handler — dispatches to specific handlers.
-   */
+  const handleSarabanDocRoute = async (currentPath) => {
+    const sdcMatch = currentPath.match(/^\/(\d+)$/);
+    if (!sdcMatch?.[1]) return false;
+
+    try {
+      const fileId = sdcMatch[1];
+      activeSdcId = fileId;
+      const docDetail = await apiService.getSarabanDocFileDetail(fileId);
+      if (docDetail && docDetail.url) {
+        const urlWithId = docDetail.url + (docDetail.url.includes('?') ? '&' : '?') + 'sdcId=' + fileId;
+        const data = await apiService.importPdfFromUrl(urlWithId);
+        const newPdfId = data.OriginalFileId || data.id || data.fileId;
+
+        if (newPdfId) {
+          window.history.replaceState({}, '', `/pdf/${newPdfId}`);
+          await loadWorkspace(newPdfId);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load Saraban doc:', error);
+      alert('ไม่สามารถโหลดข้อมูลไฟล์จากระบบได้');
+    }
+    return false;
+  };
+
+  const handleJwtTokenRoute = async (currentPath) => {
+    const jwtMatch = currentPath.match(/^\/(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/);
+    if (!jwtMatch?.[1]) return false;
+
+    const token = jwtMatch[1];
+    console.log('[JWT] Detected JWT token in URL, decoding...');
+
+    try {
+      const decoded = await apiService.decodeToken(token);
+      console.log('[JWT] Token validated successfully');
+
+      if (decoded.user_id || decoded.user_type) {
+        sessionStorage.setItem('jwt_user_id', decoded.user_id ? String(decoded.user_id) : '');
+        sessionStorage.setItem('jwt_user_type', decoded.user_type ? String(decoded.user_type) : '');
+      }
+
+      const docId = String(decoded.doc_attach_id);
+      console.log('[JWT] Redirecting to clean URL via location.replace...');
+      window.location.replace(`/${docId}`);
+      return true;
+    } catch (error) {
+      console.error('[JWT] Failed to decode token:', error);
+      alert('ไม่สามารถตรวจสอบสิทธิ์การเข้าถึงได้ (JWT ไม่ถูกต้อง)');
+      return false;
+    }
+  };
+
   const handleRouteChange = async () => {
+    const sessionUserId = sessionStorage.getItem('jwt_user_id');
+    const sessionUserType = sessionStorage.getItem('jwt_user_type');
+    if (sessionUserId || sessionUserType) {
+      editorStore.setJwtUser(sessionUserId || null, sessionUserType || null);
+    }
+
     isDocumentLoading.value = true;
     try {
       const fullHref = window.location.href;
@@ -242,6 +301,8 @@ export function useRouteHandler(deps) {
       if (await handleLocalPathImport(decodedPath)) return true;
 
       const currentPath = window.location.pathname;
+      if (await handleJwtTokenRoute(currentPath)) return true;
+      if (await handleSarabanDocRoute(currentPath)) return true;
       if (await handleFilePathParam(currentPath)) return true;
       if (await handlePdfIdRoute(currentPath)) return true;
       if (await handleHistoryRoute(currentPath)) return true;
@@ -254,6 +315,7 @@ export function useRouteHandler(deps) {
   return {
     handleRouteChange,
     getActivePdfId,
+    getActiveSdcId,
     loadWorkspace
   };
 }

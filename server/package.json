@@ -10,7 +10,8 @@
         "format": "prettier --write .",
         "generate": "dotenv -e ../.env -- prisma generate",
         "db:push": "dotenv -e ../.env -- prisma db push",
-        "db:seed": "dotenv -e ../.env -- prisma db seed"
+        "db:seed": "dotenv -e ../.env -- prisma db seed",
+        "studio": "dotenv -e ../.env -- prisma studio"
     },
     "keywords": [],
     "author": "",
@@ -21,6 +22,7 @@
         "cors": "^2.8.5",
         "dotenv": "^16.4.5",
         "express": "^4.21.2",
+        "jsonwebtoken": "^9.0.3",
         "multer": "^1.4.5-lts.1",
         "node-cron": "^4.2.1",
         "pdf-lib": "^1.17.1",

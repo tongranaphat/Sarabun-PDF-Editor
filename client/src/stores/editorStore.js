@@ -23,6 +23,14 @@ export const useEditorStore = defineStore('editor', () => {
   const documentTitle = ref('');
   const isSidebarOpen = ref(false);
 
+  const jwtUserId = ref(null);
+  const jwtUserType = ref(null);
+
+  const setJwtUser = (userId, userType) => {
+    jwtUserId.value = userId;
+    jwtUserType.value = userType;
+  };
+
   const deletePage = (index) => {
     pages.value.splice(index, 1);
     if (currentPageIndex.value >= pages.value.length) {
@@ -45,8 +53,12 @@ export const useEditorStore = defineStore('editor', () => {
     currentReportId,
     documentTitle,
     isSidebarOpen,
+    jwtUserId,
+    jwtUserType,
+    setJwtUser,
     deletePage,
     resetState,
     getMachineId
   };
 });
+

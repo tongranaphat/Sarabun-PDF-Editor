@@ -19,6 +19,7 @@ const healthRoutes = require('./routes/healthRoutes');
 
 const signatoryRoutes = require('./routes/signatoryRoutes');
 const stampConfigRoutes = require('./routes/stampConfigRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -97,6 +98,7 @@ app.use('/api', variableRoutes);
 app.use('/api', pdfRoutes);
 app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
+app.use('/api', authRoutes);
 
 app.use(notFound);
 app.use(globalErrorHandler);

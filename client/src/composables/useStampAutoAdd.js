@@ -1,4 +1,5 @@
 import apiService from '../services/apiService';
+import { useEditorStore } from '../stores/editorStore';
 
 /**
  * Centralized stamp auto-add logic.
@@ -45,6 +46,11 @@ export function useStampAutoAdd() {
           const formData = new FormData();
           formData.append('OriginalFileId', fileId);
           formData.append('editState', JSON.stringify(pagesData));
+          
+          const editorStore = useEditorStore();
+          formData.append('createdBy', editorStore.jwtUserId || '');
+          formData.append('createdByType', editorStore.jwtUserType || '');
+          
           await apiService.savePdfState(formData);
         } catch (err) {
           console.error('Failed to auto-save stamp block', err);

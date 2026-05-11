@@ -25,8 +25,9 @@ const prepareWorkspace = async (req, res) => {
 
         try {
             await fsp.access(absoluteSource);
+            logger.info(`[prepareWorkspace] Found source file at: ${absoluteSource}`);
         } catch {
-            logger.error(`[prepareWorkspace] File not found on disk: ${absoluteSource}`);
+            logger.error(`[prepareWorkspace] File not found on disk at: ${absoluteSource}. DB record exists but physical file is missing.`);
             return res.status(404).json({ error: 'ไม่พบไฟล์ต้นฉบับบนเซิร์ฟเวอร์' });
         }
 
@@ -48,7 +49,8 @@ const prepareWorkspace = async (req, res) => {
         res.json({
             message: 'เตรียม Workspace สำเร็จ',
             tempPath: tempFilePath,
-            editState: pdf.editState
+            editState: pdf.editState,
+            originalUrl: pdf.OriginalUrlorPath
         });
     } catch (error) {
         console.error('[prepareWorkspace] Error:', error);
@@ -137,7 +139,23 @@ const importPdfUrl = async (req, res) => {
             where: { OriginalUrlorPath: url }
         });
 
-        if (!cachedPdf) {
+        if (cachedPdf) {
+            const cleanPath = cachedPdf.FilePath.replace(/^\//, '');
+            const absolutePath = path.join(__dirname, '..', cleanPath);
+            try {
+                await fsp.access(absolutePath);
+                return res.status(200).json({
+                    ...cachedPdf,
+                    id: cachedPdf.OriginalFileId,
+                    fileId: cachedPdf.OriginalFileId,
+                    filepath: cachedPdf.FilePath
+                });
+            } catch (err) {
+                logger.warn(`[importPdfUrl] Cached record exists but file is missing at ${absolutePath}. Re-downloading...`);
+            }
+        }
+
+        if (true) {
             const downloadUrl = convertGDriveUrl(url);
 
             const response = await axios.get(downloadUrl, { responseType: 'stream' });
@@ -165,15 +183,24 @@ const importPdfUrl = async (req, res) => {
                 writer.on('error', reject);
             });
 
-            cachedPdf = await prisma.pdfCache.create({
-                data: {
-                    FileName: exactName,
-                    OriginalUrlorPath: url,
-                    FilePath: `/uploads/original/cache/${exactName}`,
-                    OriginalFile: true,
-                    EditedFile: false
-                }
-            });
+            const data = {
+                FileName: exactName,
+                OriginalUrlorPath: url,
+                FilePath: `/uploads/original/cache/${exactName}`,
+                OriginalFile: true,
+                EditedFile: false
+            };
+
+            if (cachedPdf) {
+                cachedPdf = await prisma.pdfCache.update({
+                    where: { OriginalFileId: cachedPdf.OriginalFileId },
+                    data
+                });
+                logger.info(`[importPdfUrl] Updated existing record with re-downloaded file: ${cachedPdf.OriginalFileId}`);
+            } else {
+                cachedPdf = await prisma.pdfCache.create({ data });
+                logger.info(`[importPdfUrl] Created new record for: ${url}`);
+            }
         }
 
         res.status(200).json({
@@ -505,7 +532,7 @@ const deletePdf = async (req, res) => {
 
 const savePdfState = async (req, res) => {
     try {
-        const { OriginalFileId, editState } = req.body;
+        const { OriginalFileId, editState, createdBy, createdByType } = req.body;
 
         if (!OriginalFileId || !editState) {
             return res.status(400).json({ error: 'Missing OriginalFileId or editState' });
@@ -560,7 +587,9 @@ const savePdfState = async (req, res) => {
             data: {
                 EditedFile: true,
                 EditedFilePath: newEditedPath,
-                editState: parsedState
+                editState: parsedState,
+                createdBy: createdBy || pdf.createdBy,
+                createdByType: createdByType || pdf.createdByType
             }
         });
 
@@ -655,7 +684,7 @@ const importLocalPath = async (req, res) => {
 
 const saveGeneratedPdfState = async (req, res) => {
     try {
-        const { OriginalFileId, editState } = req.body;
+        const { OriginalFileId, editState, createdBy, createdByType } = req.body;
         if (!req.file) return res.status(400).json({ error: 'ไม่พบไฟล์ PDF ที่ส่งมา' });
         const pdf = await prisma.pdfCache.findUnique({ where: { OriginalFileId } });
         if (!pdf) return res.status(404).json({ error: 'ไม่พบโปรเจกต์ในระบบ' });
@@ -683,7 +712,9 @@ const saveGeneratedPdfState = async (req, res) => {
             data: {
                 EditedFile: true,
                 EditedFilePath: newEditedPath,
-                editState: editState ? JSON.parse(editState) : pdf.editState
+                editState: editState ? JSON.parse(editState) : pdf.editState,
+                createdBy: createdBy || pdf.createdBy,
+                createdByType: createdByType || pdf.createdByType
             }
         });
         res.status(200).json(updatedPdf);

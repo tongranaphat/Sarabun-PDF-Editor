@@ -7,13 +7,12 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - sarabun_pgdata:/var/lib/postgresql/data
+      - saraban_pgdata:/var/lib/postgresql/data
       - ./db-init:/docker-entrypoint-initdb.d
     ports:
       - "${DB_PORT}:${DB_PORT}"
     healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}" ]
       interval: 3s
       timeout: 5s
       retries: 5
@@ -31,13 +30,14 @@ services:
       - PORT=${SERVER_PORT}
       - NODE_ENV=production
       - ALLOWED_ORIGINS=*
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
-      - sarabun_uploads:/app/uploads
+      - saraban_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${SERVER_PORT}/api/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:${SERVER_PORT}/api/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -55,5 +55,5 @@ services:
         condition: service_healthy
 
 volumes:
-  sarabun_pgdata:
-  sarabun_uploads:
+  saraban_pgdata:
+  saraban_uploads:

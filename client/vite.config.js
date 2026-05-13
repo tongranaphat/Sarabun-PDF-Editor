@@ -29,6 +29,19 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       assetsInlineLimit: 0
+    },
+    preview: {
+      port: 4000,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:4010',
+          changeOrigin: true
+        },
+        '/uploads': {
+          target: 'http://localhost:4010',
+          changeOrigin: true
+        }
+      }
     }
   };
 });

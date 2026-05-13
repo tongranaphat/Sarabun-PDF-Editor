@@ -2,11 +2,18 @@ import axios from 'axios';
 
 const MANUAL_API_BASE = import.meta.env.VITE_API_BASE_URL;
 
-const BACKEND_PORT = import.meta.env.VITE_API_PORT || '4011';
-const envApiUrl = import.meta.env.VITE_API_URL || '/api';
+let API_BASE;
+let BACKEND_BASE;
 
-const API_BASE = MANUAL_API_BASE || `${window.location.origin.replace(/:\d+$/, '')}:${BACKEND_PORT}${envApiUrl}`;
-const BACKEND_BASE = API_BASE.replace('/api', '');
+if (import.meta.env.PROD) {
+  API_BASE = MANUAL_API_BASE || '/api';
+  BACKEND_BASE = MANUAL_API_BASE ? MANUAL_API_BASE.replace('/api', '') : '';
+} else {
+  const BACKEND_PORT = import.meta.env.VITE_API_PORT || '4011';
+  const envApiUrl = import.meta.env.VITE_API_URL || '/api';
+  API_BASE = MANUAL_API_BASE || `${window.location.origin.replace(/:\d+$/, '')}:${BACKEND_PORT}${envApiUrl}`;
+  BACKEND_BASE = API_BASE.replace('/api', '');
+}
 
 const api = axios.create({
   baseURL: API_BASE,

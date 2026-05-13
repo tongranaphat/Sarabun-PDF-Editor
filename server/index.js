@@ -85,14 +85,6 @@ if (fs.existsSync(uploadSampleDir)) {
     );
 }
 
-app.get('/', (req, res) => {
-    res.status(200).json({
-        status: 'success',
-        message: 'Dynamic Report API is running perfectly!',
-        endpoints: '/api'
-    });
-});
-
 app.use('/api', healthRoutes);
 app.use('/api', variableRoutes);
 app.use('/api', pdfRoutes);
@@ -100,7 +92,26 @@ app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
 app.use('/api', authRoutes);
 
-app.use(notFound);
+if (process.env.NODE_ENV === 'production') {
+    const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+    logger.info(`Serving static frontend from ${clientDistPath}`);
+    app.use(express.static(clientDistPath));
+
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+} else {
+    app.get('/', (req, res) => {
+        res.status(200).json({
+            status: 'success',
+            message: 'Backend API is running in development mode. Please use the Vite dev server for the frontend.',
+            endpoints: '/api'
+        });
+    });
+
+    app.use(notFound);
+}
+
 app.use(globalErrorHandler);
 
 const startServer = async () => {

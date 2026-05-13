@@ -6,12 +6,13 @@
     "docker:db": "docker-compose up -d db",
     "docker:down": "docker-compose down",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "prod": "npm run generate --prefix server && npm run db:push --prefix server && npm run db:seed --prefix server && npm run build --prefix client && concurrently \"node server/index.js\" \"npm run preview --prefix client\""
+    "prod": "npm run generate --prefix server && npm run db:push --prefix server && npm run db:seed --prefix server && npm run build --prefix client && cross-env NODE_ENV=production node server/index.js"
   },
   "dependencies": {
     "multer": "^2.0.2"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0"
   }
 }

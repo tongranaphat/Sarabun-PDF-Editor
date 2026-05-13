@@ -22,7 +22,7 @@ out
 
 # Environment Variables
 .env
-.env-dev
+#.env-dev
 
 # Editor directories and files
 .vscode/*

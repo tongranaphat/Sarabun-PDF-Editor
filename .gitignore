@@ -22,7 +22,8 @@ out
 
 # Environment Variables
 .env
-#.env-dev
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*

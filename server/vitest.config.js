@@ -7,7 +7,7 @@ export default defineConfig({
         setupFiles: ['./tests/setup.js'],
         include: ['tests/**/*.test.js'],
         env: {
-            DATABASE_URL: 'postgresql://postgres:REDACTED_CREDENTIAL@localhost:5433/document_management_db?schema=test'
+            DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5433/document_management_db?schema=test'
         }
     },
 });

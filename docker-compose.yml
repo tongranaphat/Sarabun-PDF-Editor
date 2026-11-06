@@ -3,8 +3,8 @@ services:
     image: postgres:18-alpine
     command: -p ${DB_PORT}
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - saraban_pgdata:/var/lib/postgresql/data
@@ -12,7 +12,7 @@ services:
     ports:
       - "${DB_PORT}:${DB_PORT}"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:?Set DB_USER} -d ${DB_NAME} -p ${DB_PORT}" ]
       interval: 3s
       timeout: 5s
       retries: 5
@@ -26,11 +26,14 @@ services:
       - "${SERVER_PORT}:${SERVER_PORT}"
       - "${PRISMA_PORT}:${PRISMA_PORT}"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}?schema=public
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL with host db and DB_PORT}
       - PORT=${SERVER_PORT}
       - NODE_ENV=production
       - ALLOWED_ORIGINS=*
-      - JWT_SECRET=${JWT_SECRET}
+      - SDC_API_BASE_URL=${SDC_API_BASE_URL:-http://10.0.0.99/api/service}
+      - SDC_API_AUTHORIZATION=${SDC_API_AUTHORIZATION:-}
+      - SEED_USER_PASSWORD=${SEED_USER_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET}
     volumes:
       - saraban_uploads:/app/uploads
     depends_on:

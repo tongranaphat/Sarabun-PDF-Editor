@@ -91,6 +91,7 @@ app.use('/api', pdfRoutes);
 app.use('/api', signatoryRoutes);
 app.use('/api', stampConfigRoutes);
 app.use('/api', authRoutes);
+app.use('/api', require('./routes/sdcRoutes'));
 
 if (process.env.NODE_ENV === 'production') {
     const clientDistPath = path.join(__dirname, '..', 'client', 'dist');

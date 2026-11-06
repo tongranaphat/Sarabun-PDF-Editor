@@ -44,26 +44,21 @@ api.interceptors.response.use(
   }
 );
 
-const SdcApi = axios.create({
-  baseURL: 'http://10.0.0.99/api/service',
-  headers: {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Authorization': 'basic REDACTED_CREDENTIAL'
-  }
-});
-
-const SdcApiUpload = axios.create({
-  baseURL: 'http://10.0.0.99/api/service',
-  headers: {
-    'Accept': 'application/json',
-    'Authorization': 'basic REDACTED_CREDENTIAL'
-  }
-});
+const SdcApi = axios.create({ baseURL: `${API_BASE}/sdc` });
+const SdcApiUpload = axios.create({ baseURL: `${API_BASE}/sdc` });
+for (const client of [SdcApi, SdcApiUpload]) {
+  client.interceptors.request.use((config) => {
+    const token = sessionStorage.getItem('sdc_document_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  });
+}
 
 export const apiService = {
   async decodeToken(token) {
+    sessionStorage.removeItem('sdc_document_token');
     const response = await api.post('/auth/decode-token', { token });
+    sessionStorage.setItem('sdc_document_token', token);
     return response.data;
   },
 

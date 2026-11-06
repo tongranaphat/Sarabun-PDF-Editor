@@ -15,7 +15,7 @@ async function main() {
         create: {
             id: 'user_sample',
             username: 'นายทดสอบ ระบบ',
-            password: '',
+            password: process.env.SEED_USER_PASSWORD || require('crypto').randomBytes(32).toString('hex'),
         },
     });
     console.log(`  ✅ User: ${user.id} (${user.username})`);

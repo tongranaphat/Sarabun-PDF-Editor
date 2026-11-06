@@ -10,25 +10,14 @@ const decodeToken = async (req, res) => {
         }
 
         const JWT_SECRET = process.env.JWT_SECRET;
+        if (!JWT_SECRET) {
+            return res.status(503).json({ error: 'JWT verification is not configured' });
+        }
         let decoded;
-
-        if (JWT_SECRET) {
-            try {
-                decoded = jwt.verify(token, JWT_SECRET);
-                logger.info('[JWT] Token verified successfully with secret key');
-            } catch (verifyErr) {
-                logger.warn(`[JWT] Verify failed: ${verifyErr.message}, falling back to decode-only`);
-                decoded = jwt.decode(token);
-                if (!decoded) {
-                    return res.status(400).json({ error: 'Invalid token format' });
-                }
-            }
-        } else {
-            logger.warn('[JWT] No JWT_SECRET configured — decoding without verification (dev mode)');
-            decoded = jwt.decode(token);
-            if (!decoded) {
-                return res.status(400).json({ error: 'Invalid token format' });
-            }
+        try {
+            decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256', 'HS384', 'HS512'] });
+        } catch {
+            return res.status(401).json({ error: 'Invalid or expired token' });
         }
 
         const { doc_attach_id, user_id, user_type, date } = decoded;
